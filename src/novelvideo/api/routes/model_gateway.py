@@ -26,6 +26,10 @@ from novelvideo.model_gateway_settings import (
     set_model_gateway_mode,
 )
 from novelvideo.model_gateway_runtime import refresh_model_gateway_runtime
+from novelvideo.dreamina_bridge import (
+    DreaminaBridgeClient,
+    dreamina_bridge_status_stub,
+)
 from novelvideo.shared.runtime_env import is_ce_effective
 from novelvideo.newapi_provisioner import (
     build_channel_payload,
@@ -105,6 +109,10 @@ class NewApiInitBody(BaseModel):
     remain_quota: int = Field(default=0, alias="remainQuota")
     expired_time: int = Field(default=-1, alias="expiredTime")
     reuse_existing: bool = Field(default=True, alias="reuseExisting")
+
+
+class DreaminaLoginCheckBody(BaseModel):
+    device_code: str = Field(alias="deviceCode", min_length=8, max_length=512)
 
 
 class CreateChannelBody(BaseModel):
@@ -336,6 +344,12 @@ def _media_relay_status() -> dict[str, Any]:
 
 @router.get("/config")
 async def get_model_gateway_config() -> dict[str, Any]:
+    dreamina_status = dreamina_bridge_status_stub()
+    if dreamina_status["configured"]:
+        try:
+            dreamina_status = await DreaminaBridgeClient().status()
+        except Exception as exc:
+            dreamina_status = dreamina_bridge_status_stub(str(exc))
     return {
         "ok": True,
         "data": {
@@ -345,8 +359,46 @@ async def get_model_gateway_config() -> dict[str, Any]:
             ),
             "provisioner": build_provisioner_status(),
             "mediaRelay": _media_relay_status(),
+            "dreaminaSubscription": dreamina_status,
         },
     }
+
+
+@router.get("/dreamina/status")
+async def get_dreamina_subscription_status() -> dict[str, Any]:
+    try:
+        data = await DreaminaBridgeClient().status()
+    except Exception as exc:
+        data = dreamina_bridge_status_stub(str(exc))
+    return {"ok": True, "data": data}
+
+
+@router.post("/dreamina/login/start")
+async def start_dreamina_subscription_login() -> dict[str, Any]:
+    try:
+        return {"ok": True, "data": await DreaminaBridgeClient().start_login()}
+    except Exception as exc:
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
+
+
+@router.post("/dreamina/login/check")
+async def check_dreamina_subscription_login(
+    body: DreaminaLoginCheckBody,
+) -> dict[str, Any]:
+    try:
+        data = await DreaminaBridgeClient().check_login(body.device_code)
+    except Exception as exc:
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
+    return {"ok": True, "data": data}
+
+
+@router.post("/dreamina/logout")
+async def logout_dreamina_subscription() -> dict[str, Any]:
+    try:
+        data = await DreaminaBridgeClient().logout()
+    except Exception as exc:
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
+    return {"ok": True, "data": data}
 
 
 @router.post("/official/enable")

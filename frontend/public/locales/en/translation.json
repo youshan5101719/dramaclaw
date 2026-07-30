@@ -4120,6 +4120,19 @@
           "COGNEE": "① Content Understanding & Knowledge Extraction (LLM)"
         }
       },
+      "dreamina": {
+        "title": "Dreamina Subscription",
+        "description": "Use subscription credits through the official Dreamina CLI OAuth flow. This media channel never replaces or writes a NewAPI key.",
+        "login": "Log in to Dreamina",
+        "logout": "Log out",
+        "loggedIn": "Logged in · {{level}} · {{credits}} credits remaining",
+        "loggedOut": "The host bridge is connected and waiting for Dreamina login.",
+        "bridgeMissing": "The local Dreamina host bridge is not configured.",
+        "authorizeHint": "Open the authorization page and enter this code, then check login.",
+        "checkLogin": "Check login",
+        "loginSuccess": "Dreamina login succeeded.",
+        "loginReused": "Reused the local Dreamina login."
+      },
       "embeddingModel": {
         "title": "② Vectorization & Semantic Search (Embedding)",
         "description": "Vectorizes text for semantic knowledge-base search. A custom model's dimension is bound when each project is created.",

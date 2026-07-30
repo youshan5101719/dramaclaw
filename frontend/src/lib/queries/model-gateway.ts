@@ -100,6 +100,24 @@ export interface ModelGatewayConfig {
   custom: CustomGatewayConfig;
   provisioner?: ModelGatewayProvisionerConfig;
   mediaRelay?: MediaRelayConfig;
+  dreaminaSubscription?: DreaminaSubscriptionStatus;
+}
+
+export interface DreaminaSubscriptionStatus {
+  configured: boolean;
+  reachable: boolean;
+  loggedIn: boolean;
+  reused?: boolean;
+  error?: string;
+  verificationUri?: string;
+  userCode?: string;
+  deviceCode?: string;
+  account?: {
+    totalCredit?: number;
+    userId?: string;
+    userName?: string;
+    vipLevel?: string;
+  };
 }
 
 export interface SaveOfficialConfigInput {
@@ -249,6 +267,50 @@ export function useModelGatewayConfig(enabled = true) {
         .get("api/v1/model-gateway/config", { signal })
         .json<OkResponse<ModelGatewayConfig>>(),
     enabled,
+  });
+}
+
+export function useStartDreaminaLogin() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: () =>
+      api
+        .post("api/v1/model-gateway/dreamina/login/start", { throwHttpErrors: false })
+        .json<OkResponse<DreaminaSubscriptionStatus> | ErrorResponse | FastApiErrorResponse>(),
+    onSuccess: (data) => {
+      if (data.ok === true && data.data.loggedIn) {
+        qc.invalidateQueries({ queryKey: queryKeys.modelGateway() });
+      }
+    },
+  });
+}
+
+export function useCheckDreaminaLogin() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (deviceCode: string) =>
+      api
+        .post("api/v1/model-gateway/dreamina/login/check", {
+          json: { deviceCode },
+          throwHttpErrors: false,
+        })
+        .json<OkResponse<DreaminaSubscriptionStatus> | ErrorResponse | FastApiErrorResponse>(),
+    onSuccess: (data) => {
+      if (data.ok === true) qc.invalidateQueries({ queryKey: queryKeys.modelGateway() });
+    },
+  });
+}
+
+export function useLogoutDreamina() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: () =>
+      api
+        .post("api/v1/model-gateway/dreamina/logout", { throwHttpErrors: false })
+        .json<OkResponse<DreaminaSubscriptionStatus> | ErrorResponse | FastApiErrorResponse>(),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: queryKeys.modelGateway() });
+    },
   });
 }
 

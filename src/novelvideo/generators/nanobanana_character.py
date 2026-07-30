@@ -38,6 +38,7 @@ from novelvideo.services.style_service import StyleService
 from novelvideo.generators.nanobanana_grid import (
     _InlineImagePart,
     _call_huimeng_image_api,
+    _call_dreamina_image_bridge,
     _call_newapi_image_api,
     _call_openai_image_api,
     _call_openrouter_image_api,
@@ -171,6 +172,8 @@ class NanoBananaCharacterGenerator:
                 key_name = "HUIMENGI_API_KEY"
             elif self.provider == "newapi":
                 key_name = "NEWAPI_API_KEY"
+            elif self.provider == "dreamina":
+                key_name = "DREAMINA_BRIDGE_TOKEN"
             elif self.provider == "openai":
                 key_name = "OPENAI_API_KEY"
             else:
@@ -1185,6 +1188,17 @@ STRICT REQUIREMENTS (MUST AVOID):
                 if not image_bytes and error_detail:
                     print(f"[NanoBanana Character] DramaClawAPI 失败详情: {error_detail}")
                     raise RuntimeError(error_detail)
+            elif self.provider == "dreamina":
+                image_bytes, _text_response, error_detail = await _call_dreamina_image_bridge(
+                    api_key=self.api_key,
+                    model=self.model,
+                    prompt=prompt,
+                    reference_images=None,
+                    image_config={"aspect_ratio": aspect_ratio, "image_size": image_size},
+                    base_url=self.base_url,
+                )
+                if not image_bytes and error_detail:
+                    raise RuntimeError(error_detail)
             else:
                 # Google 直连模式
                 from google.genai import types
@@ -1418,6 +1432,29 @@ STRICT REQUIREMENTS (MUST AVOID):
                 )
                 if not image_bytes and error_detail:
                     print(f"[NanoBanana Character] DramaClawAPI 失败详情: {error_detail}")
+                    raise RuntimeError(error_detail)
+            elif self.provider == "dreamina":
+                ref_images = []
+                if reference_image_bytes:
+                    ref_images.append(_named_image_ref(reference_image_bytes, reference_image_name))
+                if additional_image_bytes:
+                    additional_names = list(additional_image_names or [])
+                    for idx, image_bytes_item in enumerate(additional_image_bytes):
+                        ref_images.append(
+                            _named_image_ref(
+                                image_bytes_item,
+                                additional_names[idx] if idx < len(additional_names) else "",
+                            )
+                        )
+                image_bytes, _text_response, error_detail = await _call_dreamina_image_bridge(
+                    api_key=self.api_key,
+                    model=self.model,
+                    prompt=prompt,
+                    reference_images=ref_images or None,
+                    image_config={"aspect_ratio": aspect_ratio, "image_size": image_size},
+                    base_url=self.base_url,
+                )
+                if not image_bytes and error_detail:
                     raise RuntimeError(error_detail)
             else:
                 # Google 直连模式

@@ -4120,6 +4120,19 @@
           "COGNEE": "① 内容理解与知识抽取（LLM）"
         }
       },
+      "dreamina": {
+        "title": "即梦订阅账号",
+        "description": "通过官方 Dreamina CLI 的 OAuth 登录使用会员积分；它是独立媒体渠道，不会替换或写入 NewAPI API Key。",
+        "login": "登录即梦",
+        "logout": "退出登录",
+        "loggedIn": "已登录 · {{level}} · 剩余 {{credits}} 积分",
+        "loggedOut": "本机桥接已连接，等待登录即梦。",
+        "bridgeMissing": "尚未配置本机 Dreamina 桥接服务。",
+        "authorizeHint": "打开授权页面并输入下方代码，完成后点击“检查登录”。",
+        "checkLogin": "检查登录",
+        "loginSuccess": "即梦登录成功。",
+        "loginReused": "已复用本机即梦登录状态。"
+      },
       "embeddingModel": {
         "title": "② 向量化与语义检索（Embedding）",
         "description": "负责文本向量化和知识库语义检索。自定义模型的维度会在项目创建时绑定。",

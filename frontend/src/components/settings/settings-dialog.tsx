@@ -45,6 +45,8 @@ import {
 import {
   useModelGatewayConfig,
   useEnableOfficial,
+  useCheckDreaminaLogin,
+  useLogoutDreamina,
   useSaveOfficialConfig,
   useInitCustomNewApi,
   useSaveCustomChannel,
@@ -54,6 +56,7 @@ import {
   useSaveProviderChannels,
   useSaveMediaRelayConfig,
   useSyncProviderChannel,
+  useStartDreaminaLogin,
   type GatewayMode,
   type ModelGatewayConfig,
   type CustomChannelInput,
@@ -315,6 +318,7 @@ function ModelConfigSection({ open }: { open: boolean }) {
       <p className="mt-2 text-xs leading-relaxed text-muted-foreground">
         {t("settings.modelConfig.description")}
       </p>
+      <DreaminaSubscriptionBlock status={config?.dreaminaSubscription} />
       {modelGatewayMissing ? (
         <div className="mt-3 flex gap-2 rounded-md border border-amber-500/35 bg-amber-500/10 px-3 py-2 text-[11px] leading-relaxed text-amber-100">
           <AlertTriangle className="mt-0.5 size-3.5 shrink-0 text-amber-300" aria-hidden />
@@ -359,6 +363,117 @@ function ModelConfigSection({ open }: { open: boolean }) {
         />
       ) : null}
     </section>
+  );
+}
+
+function DreaminaSubscriptionBlock({
+  status,
+}: {
+  status: ModelGatewayConfig["dreaminaSubscription"];
+}) {
+  const { t } = useTranslation();
+  const startLogin = useStartDreaminaLogin();
+  const checkLogin = useCheckDreaminaLogin();
+  const logout = useLogoutDreamina();
+  const [loginFlow, setLoginFlow] = useState<NonNullable<typeof status>>();
+  const current = loginFlow ?? status;
+
+  const handleLogin = async () => {
+    const response = await startLogin.mutateAsync();
+    if (response.ok !== true) {
+      toast.error(getResponseErrorMessage(response, t("settings.modelConfig.requestFailed")));
+      return;
+    }
+    setLoginFlow(response.data);
+    if (response.data.loggedIn) {
+      toast.success(t("settings.modelConfig.dreamina.loginReused"));
+    }
+  };
+
+  const handleCheck = async () => {
+    const deviceCode = loginFlow?.deviceCode;
+    if (!deviceCode) return;
+    const response = await checkLogin.mutateAsync(deviceCode);
+    if (response.ok !== true) {
+      toast.error(getResponseErrorMessage(response, t("settings.modelConfig.requestFailed")));
+      return;
+    }
+    setLoginFlow(response.data);
+    if (response.data.loggedIn) toast.success(t("settings.modelConfig.dreamina.loginSuccess"));
+  };
+
+  const handleLogout = async () => {
+    const response = await logout.mutateAsync();
+    if (response.ok !== true) {
+      toast.error(getResponseErrorMessage(response, t("settings.modelConfig.requestFailed")));
+      return;
+    }
+    setLoginFlow(response.data);
+  };
+
+  return (
+    <div className="mt-4 rounded-md border border-border/70 p-3">
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div>
+          <h4 className="text-xs font-medium text-foreground">
+            {t("settings.modelConfig.dreamina.title")}
+          </h4>
+          <p className="mt-1 text-[11px] leading-relaxed text-muted-foreground">
+            {t("settings.modelConfig.dreamina.description")}
+          </p>
+          <p className={cn("mt-1 text-[11px]", current?.loggedIn ? "text-emerald-400" : "text-amber-400")}>
+            {current?.loggedIn
+              ? t("settings.modelConfig.dreamina.loggedIn", {
+                  level: current.account?.vipLevel || "-",
+                  credits: current.account?.totalCredit ?? "-",
+                })
+              : current?.configured
+                ? t("settings.modelConfig.dreamina.loggedOut")
+                : t("settings.modelConfig.dreamina.bridgeMissing")}
+          </p>
+        </div>
+        <div className="flex gap-2">
+          {current?.loggedIn ? (
+            <Button
+              type="button"
+              size="sm"
+              variant="outline"
+              onClick={handleLogout}
+              disabled={logout.isPending}
+            >
+              {t("settings.modelConfig.dreamina.logout")}
+            </Button>
+          ) : (
+            <Button
+              type="button"
+              size="sm"
+              onClick={handleLogin}
+              disabled={!current?.configured || startLogin.isPending}
+            >
+              {startLogin.isPending ? <Loader2 className="size-3.5 animate-spin" /> : null}
+              {t("settings.modelConfig.dreamina.login")}
+            </Button>
+          )}
+        </div>
+      </div>
+      {loginFlow?.verificationUri && loginFlow.userCode ? (
+        <div className="mt-3 rounded-md bg-white/[0.04] p-3 text-[11px]">
+          <p>{t("settings.modelConfig.dreamina.authorizeHint")}</p>
+          <a
+            className="mt-1 block break-all text-cyan-400 underline"
+            href={loginFlow.verificationUri}
+            target="_blank"
+            rel="noreferrer"
+          >
+            {loginFlow.verificationUri}
+          </a>
+          <p className="mt-1 font-mono text-sm text-foreground">{loginFlow.userCode}</p>
+          <Button type="button" size="sm" className="mt-2" onClick={handleCheck}>
+            {t("settings.modelConfig.dreamina.checkLogin")}
+          </Button>
+        </div>
+      ) : null}
+    </div>
   );
 }
 

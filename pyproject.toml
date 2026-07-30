@@ -57,6 +57,7 @@ dependencies = [
 
 [project.scripts]
 novelvideo = "novelvideo.cli:app"
+dramaclaw-dreamina-bridge = "novelvideo.dreamina_host_bridge:main"
 
 [project.optional-dependencies]
 world = [
