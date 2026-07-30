@@ -1572,6 +1572,10 @@ def _api_video_backend_options() -> list[VideoBackendOption]:
 
     options = newapi_video_backend_options(include_seedance2_variants=True)
     options.setdefault("newapi_happyhorse-1.0", "HappyHorse 1.0")
+    from novelvideo.dreamina_bridge import DreaminaBridgeConfig
+
+    if DreaminaBridgeConfig.from_env().configured:
+        options["dreamina_seedance2.0fast"] = "即梦订阅账号（Seedance 2.0 Fast）"
     duration_bounds = NewApiVideoGenerator._parse_duration_bounds_config(
         NEWAPI_VIDEO_DURATION_BOUNDS
     )
@@ -1580,6 +1584,8 @@ def _api_video_backend_options() -> list[VideoBackendOption]:
     for value, label in options.items():
         model = parse_newapi_video_backend(value)
         bounds = duration_bounds.get(model or "")
+        if value.startswith("dreamina_"):
+            bounds = (4, 15)
         if model == "happyhorse-1.0" and not bounds:
             bounds = (3, 15)
         if model == "grok-video-channel" and not bounds:

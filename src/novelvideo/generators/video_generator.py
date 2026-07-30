@@ -182,6 +182,73 @@ class VideoGeneratorBase(ABC):
         raise NotImplementedError("Subclass should implement generate()")
 
 
+class DreaminaSubscriptionVideoGenerator(VideoGeneratorBase):
+    """Seedance generation through a logged-in official Dreamina CLI."""
+
+    def __init__(
+        self,
+        *,
+        model: str = "seedance2.0fast",
+        resolution: str = "720p",
+        endpoint: str | None = None,
+        api_key: str | None = None,
+        **_: object,
+    ):
+        from novelvideo.dreamina_bridge import DreaminaBridgeClient, DreaminaBridgeConfig
+
+        config = DreaminaBridgeConfig.from_env()
+        self.model = model
+        self.resolution = resolution
+        self.client = DreaminaBridgeClient(
+            DreaminaBridgeConfig(
+                base_url=(endpoint or config.base_url).rstrip("/"),
+                token=api_key or config.token,
+                poll_interval_seconds=config.poll_interval_seconds,
+                task_timeout_seconds=config.task_timeout_seconds,
+            )
+        )
+
+    async def generate(
+        self,
+        image_path: Optional[str],
+        prompt: str,
+        output_path: str,
+        aspect_ratio: str = "16:9",
+        duration: float = 5.0,
+        poll_interval: float = 5.0,
+        max_polls: int = 60,
+        **kwargs,
+    ) -> VideoGenResult:
+        _ = poll_interval, max_polls
+        last_frame_path = str(kwargs.get("last_frame_path") or "").strip() or None
+        ratio = {
+            "adaptive": "9:16",
+            "2:3": "9:16",
+            "3:2": "16:9",
+        }.get(aspect_ratio, aspect_ratio)
+        try:
+            video_bytes, submit_id = await self.client.generate_video(
+                prompt=prompt,
+                ratio=ratio,
+                duration=max(4, min(15, round(duration))),
+                image_path=image_path,
+                last_frame_path=last_frame_path,
+                model=self.model,
+                resolution=self.resolution,
+            )
+            target = Path(output_path)
+            target.parent.mkdir(parents=True, exist_ok=True)
+            target.write_bytes(video_bytes)
+            return VideoGenResult(
+                status=VideoGenStatus.DONE,
+                video_path=str(target),
+                task_id=submit_id,
+                duration_seconds=float(duration),
+            )
+        except Exception as exc:
+            return VideoGenResult(status=VideoGenStatus.FAILED, error=str(exc))
+
+
 class MockVideoGenerator(VideoGeneratorBase):
     """模拟视频生成器（测试用）。
 
@@ -3510,6 +3577,13 @@ def parse_newapi_video_backend(backend: str | None) -> str | None:
     return None
 
 
+def parse_dreamina_video_backend(backend: str | None) -> str | None:
+    value = str(backend or "").strip().lower()
+    if value.startswith("dreamina_"):
+        return value.removeprefix("dreamina_").strip() or None
+    return None
+
+
 def newapi_video_backend_options(*, include_seedance2_variants: bool = False) -> dict[str, str]:
     from novelvideo.config import NEWAPI_VIDEO_MODELS
 
@@ -3581,6 +3655,10 @@ def create_video_generator(
     newapi_model = parse_newapi_video_backend(backend_str)
     if newapi_model:
         return NewApiVideoGenerator(model=newapi_model, **kwargs)
+
+    dreamina_model = parse_dreamina_video_backend(backend_str)
+    if dreamina_model:
+        return DreaminaSubscriptionVideoGenerator(model=dreamina_model, **kwargs)
 
     from novelvideo.generators.huimengi import parse_huimeng_video_backend
 

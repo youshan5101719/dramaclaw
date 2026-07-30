@@ -905,6 +905,9 @@ NANOBANANA_PROVIDER = os.environ.get("NANOBANANA_PROVIDER", "openrouter")
 
 NANOBANANA_MODEL = os.environ.get("NANOBANANA_MODEL", "gemini-3.1-flash-image-preview")
 OPENAI_IMAGE_MODEL = os.environ.get("OPENAI_IMAGE_MODEL", "gpt-image-2")
+DREAMINA_IMAGE_MODEL = os.environ.get("DREAMINA_IMAGE_MODEL", "5.0")
+DREAMINA_BRIDGE_URL = os.environ.get("DREAMINA_BRIDGE_URL", "").strip().rstrip("/")
+DREAMINA_BRIDGE_TOKEN = os.environ.get("DREAMINA_BRIDGE_TOKEN", "").strip()
 HUIMENG_IMAGE_MODEL = os.environ.get("HUIMENG_IMAGE_MODEL", "image-2")
 HUIMENG_IMAGE_OFFICIAL_MODEL = os.environ.get("HUIMENG_IMAGE_OFFICIAL_MODEL", "image-2-official")
 HUIMENG_NANOBANANA2_MODEL = os.environ.get("HUIMENG_NANOBANANA2_MODEL", "nb-2")
@@ -967,11 +970,17 @@ IMAGE_GENERATION_SELECTIONS: dict[str, dict[str, str]] = {
         "provider": "newapi",
         "model": NEWAPI_NANOBANANA2_MODEL,
     },
+    "dreamina_subscription": {
+        "label": "即梦订阅账号（Seedream 5.0）",
+        "provider": "dreamina",
+        "model": DREAMINA_IMAGE_MODEL,
+    },
 }
 
 VISIBLE_IMAGE_GENERATION_SELECTION_KEYS = (
     "newapi_gpt_image2",
     "newapi_nanobanana2",
+    "dreamina_subscription",
 )
 
 LEGACY_IMAGE_GENERATION_SELECTION_ALIASES = {
@@ -1033,6 +1042,16 @@ def image_generation_selection_options() -> dict[str, str]:
         key: IMAGE_GENERATION_SELECTIONS[key]["label"]
         for key in VISIBLE_IMAGE_GENERATION_SELECTION_KEYS
         if key in IMAGE_GENERATION_SELECTIONS
+        and (
+            key != "dreamina_subscription"
+            or bool(
+                os.environ.get("DREAMINA_BRIDGE_URL", DREAMINA_BRIDGE_URL).strip()
+                and len(
+                    os.environ.get("DREAMINA_BRIDGE_TOKEN", DREAMINA_BRIDGE_TOKEN).strip()
+                )
+                >= 32
+            )
+        )
     }
 
 
@@ -1043,13 +1062,11 @@ def character_image_selection_options() -> dict[str, str]:
 
 def _visible_image_generation_selection(value: str | None) -> str:
     candidate = str(value or "").strip()
-    if (
-        candidate in VISIBLE_IMAGE_GENERATION_SELECTION_KEYS
-        and candidate in IMAGE_GENERATION_SELECTIONS
-    ):
+    available = image_generation_selection_options()
+    if candidate in available:
         return candidate
     alias = LEGACY_IMAGE_GENERATION_SELECTION_ALIASES.get(candidate)
-    if alias in VISIBLE_IMAGE_GENERATION_SELECTION_KEYS and alias in IMAGE_GENERATION_SELECTIONS:
+    if alias in available:
         return alias
     return ""
 
@@ -1172,6 +1189,15 @@ def _image_provider_config(
             "api_key": gateway.api_key,
             "model": model or NEWAPI_IMAGE_MODEL,
             "base_url": gateway.base_url,
+        }
+    if provider == "dreamina":
+        return {
+            "provider": provider,
+            "api_key": os.environ.get("DREAMINA_BRIDGE_TOKEN", DREAMINA_BRIDGE_TOKEN).strip(),
+            "model": model or DREAMINA_IMAGE_MODEL,
+            "base_url": os.environ.get("DREAMINA_BRIDGE_URL", DREAMINA_BRIDGE_URL)
+            .strip()
+            .rstrip("/"),
         }
 
     return {"provider": "google", "api_key": GOOGLE_AI_API_KEY, "model": model or NANOBANANA_MODEL}

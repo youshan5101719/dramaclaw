@@ -11,6 +11,7 @@ attention: medium
 - **剧本导入更准确**: 导入前可预览原文、章节和场景识别结果,新增对常见中英文场景标题、括号标题和精品短剧格式的支持。
 - **任务执行更稳定**: 构建类任务统一接入任务中心,修复结束任务持续加载、知识图谱日志阻塞队列及多个规划和模型调用超时问题。
 - **外部智能体可连接 CE**: Claude Code 等本地智能体可通过 MCP 直接调用 DramaClaw CE 的项目和创作能力,无需额外配置访问令牌。
+- **即梦订阅账号成为独立媒体渠道**: 通过官方 Dreamina CLI OAuth 登录，使用会员积分生成 Seedream 图片和 Seedance 视频，同时保留 NewAPI/API Key 渠道。
 
 ## User-facing Highlights (en)
 
@@ -19,6 +20,7 @@ attention: medium
 - **More accurate screenplay imports**: Preview source text, chapters, and detected scenes before import, with broader support for common Chinese and English scene headings, bracketed headings, and premium short-drama formats.
 - **More reliable task execution**: Build operations now report through the task center, while completed-task loading, queue-blocking graph logs, planning failures, and model timeouts are handled more reliably.
 - **External agents can connect to CE**: Local agents such as Claude Code can use MCP to operate DramaClaw CE projects and creation workflows without configuring an additional access token.
+- **Dreamina subscriptions are an independent media channel**: Sign in through the official Dreamina CLI OAuth flow and use subscription credits for Seedream images and Seedance videos without replacing NewAPI/API-key channels.
 
 ## New Features
 
@@ -27,6 +29,7 @@ attention: medium
 - CE 提供无需额外令牌的 MCP 接入,支持外部智能体操作项目与创作流程 (#190).
 - 小说导入页新增原文、章节和场景识别预览 (#220).
 - 支持更多常见中英文剧本场景标题格式 (#227).
+- 新增即梦订阅账号登录、状态、积分和退出入口，并支持文生图、图生图、文生视频、图生视频及首尾帧视频。
 
 ## Bug Fixes
 
@@ -44,3 +47,4 @@ attention: medium
 
 - 降低积分汇总接口的重复请求压力 (#223).
 - 统一界面视觉规范和设计变量,提升页面样式一致性 (#212).
+- 新增受限 Dreamina 宿主桥接命令、Docker 环境配置和专项安全回归测试；桥接使用随机 Bearer Token、固定参数枚举和无 shell 的子进程调用。

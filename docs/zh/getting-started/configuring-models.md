@@ -11,6 +11,7 @@ DramaClaw CE 通过 NewAPI 兼容网关接入文本、图片、视频、音频�
 |---|---|---|
 | 官方渠道 / RelayClaw | 想最快跑通，使用官方预置模型 | 不需要 |
 | 本地 NewAPI | 希望在 DramaClaw UI 里配置本机 NewAPI 的上游渠道、模型映射、媒体模型和 embedding | 需要在 UI 里保存映射 |
+| 即梦订阅账号 | 已有即梦高级会员，希望通过官方 Dreamina CLI 使用会员积分生成图片/视频 | 不经过 NewAPI；需要宿主机桥接 |
 
 ## 配置入口
 
@@ -26,6 +27,39 @@ DramaClaw CE 通过 NewAPI 兼容网关接入文本、图片、视频、音频�
 - Embedding：配置模型、维度和批量大小。
 
 更换 key、渠道或模型后，新任务会读取新配置；已经运行中的任务不会强制中途切换。
+
+## 即梦订阅账号（官方 CLI）
+
+即梦订阅账号是独立媒体后端，不会把 OAuth 登录态伪装成 NewAPI API Key。它通过
+官方 Dreamina CLI 的 Device Flow 登录，支持文生图、图生图、文生视频、图生视频和
+首尾帧视频。文本模型、embedding 和其他供应商渠道仍由 NewAPI 管理。
+
+由于官方 `dreamina` CLI 是 macOS 程序，而 DramaClaw API 默认运行在 Linux Docker
+容器中，需要在宿主机启动受限桥接服务：
+
+```bash
+# 生成至少 32 字符的随机 token，并把同一个值写入项目 .env
+export DREAMINA_BRIDGE_TOKEN="你的随机长令牌"
+uv run dramaclaw-dreamina-bridge --host 0.0.0.0 --port 8791
+```
+
+项目 `.env` 配置：
+
+```bash
+DREAMINA_BRIDGE_URL=http://host.docker.internal:8791
+DREAMINA_BRIDGE_TOKEN=与宿主桥接相同的随机长令牌
+DREAMINA_IMAGE_MODEL=5.0
+```
+
+重启 DramaClaw 后，进入设置 -> 模型配置 -> 即梦订阅账号，点击“登录即梦”，在官方
+授权页面输入设备码，随后点击“检查登录”。登录成功后会显示会员等级和剩余积分。
+项目的图片模型下拉框会出现“即梦订阅账号（Seedream 5.0）”，视频模型下拉框会出现
+“即梦订阅账号（Seedance 2.0 Fast）”。
+
+安全边界：桥接服务使用随机 Bearer Token 鉴权，只接受固定参数枚举，并通过
+`create_subprocess_exec` 调用允许的 Dreamina 子命令；它不接受 shell 命令，也不会向
+DramaClaw 或 Git 仓库复制 OAuth token、cookie 或 CLI 登录文件。`--host 0.0.0.0` 是为了
+允许 Docker Desktop 通过 `host.docker.internal` 访问，切勿把 8791 端口转发到公网。
 
 如果启用网页“本地 NewAPI”初始化向导，只需开启 provisioner：
 

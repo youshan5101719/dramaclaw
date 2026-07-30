@@ -18,8 +18,10 @@ import io
 import json
 import logging
 import math
+import mimetypes
 import os
 import re
+import tempfile
 import time
 import uuid
 from dataclasses import dataclass
@@ -2872,7 +2874,7 @@ async def _generate_image(
                 "aspect_ratio": aspect_ratio,
                 "image_size": image_size,
                 "quality": quality or generator.openai_image_quality,
-            "request_schema": generator.newapi_request_schema,
+                "request_schema": generator.newapi_request_schema,
                 "model_params": generator.newapi_model_params,
             },
             base_url=generator.base_url,
@@ -2880,6 +2882,20 @@ async def _generate_image(
         if not image_bytes:
             raise ValueError(
                 f"DramaClawAPI image generation failed: {error_detail or 'empty image'}"
+            )
+    elif generator.provider == "dreamina":
+        ref_bytes = [Path(path).read_bytes() for path in ref_paths]
+        image_bytes, _, error_detail = await _call_dreamina_image_bridge(
+            api_key=generator.api_key,
+            model=generator.model,
+            prompt=prompt,
+            reference_images=ref_bytes or None,
+            image_config={"aspect_ratio": aspect_ratio, "image_size": image_size},
+            base_url=generator.base_url,
+        )
+        if not image_bytes:
+            raise ValueError(
+                f"Dreamina subscription image generation failed: {error_detail or 'empty image'}"
             )
     else:
         from google import genai
@@ -3704,6 +3720,56 @@ async def _call_newapi_image_api(
         return None, "", f"请求异常: {detail}"
 
 
+async def _call_dreamina_image_bridge(
+    *,
+    api_key: str,
+    model: str,
+    prompt: str,
+    reference_images: list[bytes | tuple[bytes, str] | tuple[str, bytes, str]] | None = None,
+    image_config: dict | None = None,
+    base_url: str | None = None,
+) -> tuple[bytes | None, str, str]:
+    """Generate through the official Dreamina CLI running on the host bridge."""
+    from novelvideo.dreamina_bridge import DreaminaBridgeClient, DreaminaBridgeConfig
+
+    if not api_key or not base_url:
+        return None, "", "Dreamina bridge URL or token is missing"
+    image_config = image_config or {}
+    try:
+        with tempfile.TemporaryDirectory(prefix="dreamina-images-") as temp_dir:
+            image_paths: list[str] = []
+            for index, item in enumerate(reference_images or []):
+                mime_type = "image/png"
+                if isinstance(item, tuple):
+                    if len(item) == 3:
+                        _, content, mime_type = item
+                    else:
+                        content, mime_type = item
+                else:
+                    content = item
+                suffix = mimetypes.guess_extension(str(mime_type)) or ".png"
+                path = Path(temp_dir) / f"reference_{index:02d}{suffix}"
+                path.write_bytes(content)
+                image_paths.append(str(path))
+            client = DreaminaBridgeClient(
+                DreaminaBridgeConfig(base_url=base_url, token=api_key)
+            )
+            image_bytes = await client.generate_image(
+                prompt=prompt,
+                ratio=str(image_config.get("aspect_ratio") or "1:1"),
+                image_paths=image_paths,
+                model=model,
+                resolution=(
+                    "4k"
+                    if str(image_config.get("image_size") or "").upper() == "4K"
+                    else "2k"
+                ),
+            )
+        return image_bytes, "", ""
+    except Exception as exc:
+        return None, "", str(exc)
+
+
 async def _relay_reference_images_for_newapi(
     reference_images: list[bytes | tuple[bytes, str] | tuple[str, bytes, str]],
 ) -> list[str]:
@@ -3892,6 +3958,8 @@ class NanoBananaGridGenerator:
                 key_name = "OPENAI_API_KEY"
             elif self.provider == "newapi":
                 key_name = "NEWAPI_API_KEY"
+            elif self.provider == "dreamina":
+                key_name = "DREAMINA_BRIDGE_TOKEN"
             else:
                 key_name = "GOOGLE_AI_API_KEY"
             raise ValueError(f"API key not set. Set {key_name} environment variable.")
@@ -4652,6 +4720,22 @@ class NanoBananaGridGenerator:
                     if newapi_error:
                         message = f"{message}: {newapi_error}"
                     return _usage_fail(message)
+            elif self.provider == "dreamina":
+                prompt_text, ref_bytes = self._extract_ref_bytes_from_contents(
+                    contents, include_mime=True
+                )
+                image_bytes, _, error_detail = await _call_dreamina_image_bridge(
+                    api_key=self.api_key,
+                    model=self.model,
+                    prompt=prompt_text,
+                    reference_images=ref_bytes or None,
+                    image_config={"aspect_ratio": aspect_ratio, "image_size": image_size},
+                    base_url=self.base_url,
+                )
+                if not image_bytes:
+                    return _usage_fail(
+                        f"Dreamina subscription did not return image data: {error_detail}"
+                    )
             else:
                 # ===== Google 直连分支 =====
                 # 根据模型选择配置：gemini-3 支持 image_size，gemini-2.5 不支持
@@ -4978,6 +5062,24 @@ class NanoBananaGridGenerator:
                         error=f"DramaClawAPI Images 未返回图片: {error_detail or ''}".strip(),
                         generation_time=time.time() - start_time,
                     )
+            elif self.provider == "dreamina":
+                prompt_text, ref_bytes = self._extract_ref_bytes_from_contents(
+                    contents, include_mime=True
+                )
+                image_bytes, _, error_detail = await _call_dreamina_image_bridge(
+                    api_key=self.api_key,
+                    model=self.model,
+                    prompt=prompt_text,
+                    reference_images=ref_bytes or None,
+                    image_config={"aspect_ratio": aspect_ratio, "image_size": image_size},
+                    base_url=self.base_url,
+                )
+                if not image_bytes:
+                    return GridGenerationResult(
+                        success=False,
+                        error=f"Dreamina subscription did not return image data: {error_detail}",
+                        generation_time=time.time() - start_time,
+                    )
             else:
                 from google import genai
                 from google.genai import types
@@ -5234,6 +5336,24 @@ class NanoBananaGridGenerator:
                             if newapi_error
                             else "[Reformat] DramaClawAPI Images 未返回图像数据"
                         ),
+                        generation_time=time.time() - start_time,
+                    )
+            elif self.provider == "dreamina":
+                prompt_text, ref_bytes = self._extract_ref_bytes_from_contents(
+                    contents, include_mime=True
+                )
+                image_bytes, _, error_detail = await _call_dreamina_image_bridge(
+                    api_key=self.api_key,
+                    model=self.model,
+                    prompt=prompt_text,
+                    reference_images=ref_bytes or None,
+                    image_config={"aspect_ratio": target_aspect, "image_size": target_size},
+                    base_url=self.base_url,
+                )
+                if not image_bytes:
+                    return GridGenerationResult(
+                        success=False,
+                        error=f"Dreamina subscription did not return image data: {error_detail}",
                         generation_time=time.time() - start_time,
                     )
             else:
@@ -6790,6 +6910,27 @@ CRITICAL: Keep exact composition from sketch. Only add color, texture, and light
                 if error_detail:
                     print(f"[DramaClawAPI Render] 失败: {error_detail}")
                 return None
+            elif self.provider == "dreamina":
+                prompt_text, ref_bytes = self._extract_ref_bytes_from_contents(
+                    contents, include_mime=True
+                )
+                image_bytes, _, error_detail = await _call_dreamina_image_bridge(
+                    api_key=self.api_key,
+                    model=self.model,
+                    prompt=prompt_text,
+                    reference_images=ref_bytes or None,
+                    image_config={
+                        "aspect_ratio": target_aspect_ratio or "9:16",
+                        "image_size": "2K",
+                    },
+                    base_url=self.base_url,
+                )
+                if image_bytes:
+                    Path(output_path).write_bytes(image_bytes)
+                    return output_path
+                if error_detail:
+                    print(f"[Dreamina Render] 失败: {error_detail}")
+                return None
             else:
                 # ===== Google 直连分支 =====
                 from google import genai
@@ -7013,6 +7154,27 @@ CRITICAL: The output must look like a higher-resolution vertical crop/extension 
                 Path(temp_path).unlink()
                 print(f"[NanoBananaPro Upscale] 完成: {output_path}")
                 return Path(output_path)
+            elif self.provider == "dreamina":
+                ref_bytes = []
+                if hasattr(ref_image, "inline_data") and ref_image.inline_data:
+                    ref_bytes.append(
+                        (
+                            ref_image.inline_data.data,
+                            getattr(ref_image.inline_data, "mime_type", "image/png") or "image/png",
+                        )
+                    )
+                image_bytes, _, error_detail = await _call_dreamina_image_bridge(
+                    api_key=self.api_key,
+                    model=self.model,
+                    prompt=prompt,
+                    reference_images=ref_bytes or None,
+                    image_config={"aspect_ratio": "9:16", "image_size": "2K"},
+                    base_url=self.base_url,
+                )
+                if not image_bytes:
+                    raise ValueError(error_detail or "Dreamina subscription returned no image data")
+                Path(output_path).write_bytes(image_bytes)
+                return Path(output_path)
             else:
                 # ===== Google 直连分支 =====
                 from google import genai
@@ -7186,6 +7348,20 @@ OUTPUT: Single high-quality image, no watermarks, no text overlays.
                 )
                 if not image_bytes and error_detail:
                     print(f"[StylePreview] DramaClawAPI 失败详情: {error_detail}")
+            elif self.provider == "dreamina":
+                prompt_text, ref_bytes = self._extract_ref_bytes_from_contents(
+                    contents, include_mime=True
+                )
+                image_bytes, _, error_detail = await _call_dreamina_image_bridge(
+                    api_key=self.api_key,
+                    model=self.model,
+                    prompt=prompt_text,
+                    reference_images=ref_bytes or None,
+                    image_config={"aspect_ratio": "9:16", "image_size": "2K"},
+                    base_url=self.base_url,
+                )
+                if not image_bytes and error_detail:
+                    print(f"[StylePreview] Dreamina 失败详情: {error_detail}")
             else:
                 # ===== Google 直连分支 =====
                 from google import genai
