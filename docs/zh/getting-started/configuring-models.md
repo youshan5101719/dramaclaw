@@ -17,8 +17,6 @@ DramaClaw CE 通过 NewAPI 兼容网关接入文本、图片、视频、音频�
 
 启动后打开 `http://localhost:8080`，进入设置 → 模型配置。渠道选择、网关地址和 token 都保存在本机 `settings.db`，不从环境变量读取。
 
-启动后打开 `http://localhost:8080`，进入设置 -> 模型配置。
-
 在网页里可以完成：
 
 - 官方渠道：填写 RelayClaw DC key，点击“保存并启用”。官方地址固定。

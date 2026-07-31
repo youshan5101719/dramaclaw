@@ -16,7 +16,7 @@ const modelModules = import.meta.glob<{ imageModel: ImageModelDefinition }>(
   { eager: true }
 );
 
-const SUPERTALE_PROVIDER_IDS = new Set(['huimeng', 'openai', 'openrouter']);
+const SUPERTALE_PROVIDER_IDS = new Set(['dreamina', 'huimeng', 'newapi', 'openai', 'openrouter']);
 const SUPERTALE_IMAGE_MODEL_IDS = new Set([
   'huimeng/default',
   'openai/gpt-image-2',

@@ -974,6 +974,7 @@ IMAGE_GENERATION_SELECTIONS: dict[str, dict[str, str]] = {
         "label": "即梦订阅账号（Seedream 5.0）",
         "provider": "dreamina",
         "model": DREAMINA_IMAGE_MODEL,
+        "billing_model": f"dreamina_{DREAMINA_IMAGE_MODEL}",
     },
 }
 
@@ -1058,6 +1059,12 @@ def image_generation_selection_options() -> dict[str, str]:
 def character_image_selection_options() -> dict[str, str]:
     """Return UI labels for character/identity image generation."""
     return image_generation_selection_options()
+
+
+def image_generation_selection_billing_model(selection: str) -> str:
+    """Return a provider-specific pricing identity for an image selection."""
+    entry = IMAGE_GENERATION_SELECTIONS.get(str(selection or "").strip()) or {}
+    return str(entry.get("billing_model") or entry.get("model") or "").strip()
 
 
 def _visible_image_generation_selection(value: str | None) -> str:

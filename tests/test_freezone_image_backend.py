@@ -338,6 +338,79 @@ async def test_freezone_video_omni_gen_rejects_happyhorse_model(
 
 
 @pytest.mark.asyncio
+async def test_freezone_video_omni_gen_rejects_dreamina_model(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    _patch_freezone_project(monkeypatch, tmp_path)
+    monkeypatch.setenv("DREAMINA_BRIDGE_URL", "http://bridge.test")
+    monkeypatch.setenv("DREAMINA_BRIDGE_TOKEN", "t" * 32)
+
+    with pytest.raises(HTTPException) as exc:
+        await freezone_routes.freezone_video_omni_gen(
+            project="58",
+            body=freezone_routes.FreezoneVideoOmniGenRequest(
+                prompt="雨夜街头，人物缓慢回头。",
+                model="dreamina_seedance2.0fast",
+            ),
+            user={"username": "admin"},
+        )
+
+    assert exc.value.status_code == 400
+    assert "does not support omni reference mode" in str(exc.value.detail)
+
+
+@pytest.mark.asyncio
+async def test_freezone_video_edit_rejects_dreamina_model(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    _patch_freezone_project(monkeypatch, tmp_path)
+    monkeypatch.setenv("DREAMINA_BRIDGE_URL", "http://bridge.test")
+    monkeypatch.setenv("DREAMINA_BRIDGE_TOKEN", "t" * 32)
+
+    with pytest.raises(HTTPException) as exc:
+        await freezone_routes.freezone_video_edit(
+            project="58",
+            body=freezone_routes.FreezoneVideoEditRequest(
+                video_url="/static/admin/58/freezone/_uploads/source.mp4",
+                model="dreamina_seedance2.0fast",
+            ),
+            user={"username": "admin"},
+        )
+
+    assert exc.value.status_code == 400
+    assert "only supports HappyHorse" in str(exc.value.detail)
+
+
+@pytest.mark.asyncio
+async def test_freezone_dreamina_two_images_require_keyframes_endpoint(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    _patch_freezone_project(monkeypatch, tmp_path)
+    monkeypatch.setenv("DREAMINA_BRIDGE_URL", "http://bridge.test")
+    monkeypatch.setenv("DREAMINA_BRIDGE_TOKEN", "t" * 32)
+
+    with pytest.raises(HTTPException) as exc:
+        await freezone_routes.freezone_video_i2v(
+            project="58",
+            body=freezone_routes.FreezoneImageToVideoRequest(
+                image_urls=[
+                    "/static/admin/58/freezone/_uploads/first.png",
+                    "/static/admin/58/freezone/_uploads/last.png",
+                ],
+                model="dreamina_seedance2.0fast",
+                gen_mode="first_last_frame",
+            ),
+            user={"username": "admin"},
+        )
+
+    assert exc.value.status_code == 400
+    assert "use the keyframes endpoint" in str(exc.value.detail)
+
+
+@pytest.mark.asyncio
 async def test_freezone_video_start_runtime_error_is_logged(
     monkeypatch: pytest.MonkeyPatch,
     tmp_path: Path,
@@ -3222,6 +3295,53 @@ async def test_scene_360_endpoint_caps_mainline_image_size_to_2k(
     assert captured["payload"]["billing"]["size"] == "2K"
     assert captured["payload"]["billing"]["quality"] == "low"
     assert captured["payload"]["billing"]["pricing_kind"] == "image"
+
+
+@pytest.mark.asyncio
+async def test_scene_360_endpoint_routes_dreamina_selection_to_host_backend(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    ctx = _project_ctx(tmp_path)
+    captured: dict = {}
+
+    async def fake_resolve_freezone_project(*_args, **_kwargs):
+        return ctx, "admin", "demo", ctx.output_dir, str(ctx.output_dir)
+
+    async def fake_enqueue_project_task(_ctx: ProjectContext, **kwargs):
+        captured.update(kwargs)
+        captured["payload"] = kwargs.get("payload") or {}
+        return SimpleNamespace(
+            task_state=SimpleNamespace(task_id="task_scene_360"),
+            backend="celery",
+            queue="node.node_a.world",
+        )
+
+    monkeypatch.setenv("DREAMINA_BRIDGE_URL", "http://bridge.test")
+    monkeypatch.setenv("DREAMINA_BRIDGE_TOKEN", "t" * 32)
+    monkeypatch.setattr(freezone_routes, "_resolve_freezone_project", fake_resolve_freezone_project)
+    monkeypatch.setattr(
+        freezone_routes,
+        "get_task_backend",
+        lambda: SimpleNamespace(enqueue_project_task=fake_enqueue_project_task),
+    )
+    _write_image(ctx.output_dir / "assets" / "scenes" / "小区" / "master.png")
+
+    await freezone_routes.freezone_scene_360(
+        project="proj_freezone",
+        body=freezone_routes.FreezoneScene360Request(
+            reference_url="/api/v1/projects/proj_freezone/media/assets/scenes/小区/master.png",
+            model="dreamina_subscription",
+        ),
+        user={"username": "admin"},
+    )
+
+    params = captured["payload"]["params"]
+    billing = captured["payload"]["billing"]
+    assert params["provider"] == "dreamina"
+    assert params["model"] == "5.0"
+    assert billing["pricing_model"] == "dreamina_5.0"
+    assert billing["provider"] == "dreamina"
 
 
 def _skill_beat_input() -> dict:
@@ -6247,6 +6367,8 @@ async def test_freezone_image_models_returns_selection_keys(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
+    monkeypatch.delenv("DREAMINA_BRIDGE_URL", raising=False)
+    monkeypatch.delenv("DREAMINA_BRIDGE_TOKEN", raising=False)
     _patch_freezone_project(monkeypatch, tmp_path, project="58")
 
     result = await freezone_routes.freezone_image_models(
@@ -6280,6 +6402,12 @@ async def test_freezone_image_models_prefers_ee_catalog(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
+    import novelvideo.config as config
+
+    monkeypatch.delenv("DREAMINA_BRIDGE_URL", raising=False)
+    monkeypatch.delenv("DREAMINA_BRIDGE_TOKEN", raising=False)
+    monkeypatch.setattr(config, "DREAMINA_BRIDGE_URL", "")
+    monkeypatch.setattr(config, "DREAMINA_BRIDGE_TOKEN", "")
     _patch_freezone_project(monkeypatch, tmp_path, project="58")
     catalog = [
         {
@@ -6303,6 +6431,104 @@ async def test_freezone_image_models_prefers_ee_catalog(
     )
 
     assert result == {"ok": True, "data": catalog}
+
+
+@pytest.mark.asyncio
+async def test_freezone_image_models_merges_dreamina_into_ee_catalog(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    _patch_freezone_project(monkeypatch, tmp_path, project="58")
+    monkeypatch.setenv("DREAMINA_BRIDGE_URL", "http://bridge.test")
+    monkeypatch.setenv("DREAMINA_BRIDGE_TOKEN", "t" * 32)
+    catalog = [
+        {
+            "id": "custom-image",
+            "providerId": "newapi",
+            "apiModel": "custom-upstream",
+            "label": "Custom Image",
+        }
+    ]
+
+    async def fake_catalog(media_type: str) -> list[dict[str, object]]:
+        assert media_type == "image"
+        return catalog
+
+    monkeypatch.setattr(freezone_routes, "_ee_media_model_catalog", fake_catalog)
+    result = await freezone_routes.freezone_image_models(
+        project="58",
+        user={"username": "admin"},
+    )
+
+    assert result["data"][0] == catalog[0]
+    assert result["data"][1]["id"] == "dreamina_subscription"
+    assert result["data"][1]["providerId"] == "dreamina"
+
+
+@pytest.mark.asyncio
+async def test_freezone_image_models_deduplicates_dreamina_in_ee_catalog(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    _patch_freezone_project(monkeypatch, tmp_path, project="58")
+    monkeypatch.setenv("DREAMINA_BRIDGE_URL", "http://bridge.test")
+    monkeypatch.setenv("DREAMINA_BRIDGE_TOKEN", "t" * 32)
+    catalog = [
+        {
+            "id": "dreamina_subscription",
+            "providerId": "dreamina",
+            "apiModel": "dreamina_subscription",
+            "label": "Managed Dreamina",
+        }
+    ]
+
+    async def fake_catalog(media_type: str) -> list[dict[str, object]]:
+        assert media_type == "image"
+        return catalog
+
+    monkeypatch.setattr(freezone_routes, "_ee_media_model_catalog", fake_catalog)
+    result = await freezone_routes.freezone_image_models(
+        project="58",
+        user={"username": "admin"},
+    )
+
+    assert result == {"ok": True, "data": catalog}
+
+
+@pytest.mark.asyncio
+async def test_freezone_video_models_merges_dreamina_into_ee_catalog(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    _patch_freezone_project(monkeypatch, tmp_path, project="58")
+    monkeypatch.setenv("DREAMINA_BRIDGE_URL", "http://bridge.test")
+    monkeypatch.setenv("DREAMINA_BRIDGE_TOKEN", "t" * 32)
+    catalog = [
+        {
+            "id": "custom-video",
+            "providerId": "newapi",
+            "apiModel": "custom-video-upstream",
+            "label": "Custom Video",
+        }
+    ]
+
+    async def fake_catalog(media_type: str) -> list[dict[str, object]]:
+        assert media_type == "video"
+        return catalog
+
+    monkeypatch.setattr(freezone_routes, "_ee_media_model_catalog", fake_catalog)
+    result = await freezone_routes.freezone_video_models(
+        project="58",
+        user={"username": "admin"},
+    )
+
+    assert result["data"][0] == catalog[0]
+    assert result["data"][1]["id"] == "dreamina_seedance2.0fast"
+    assert result["data"][1]["supportedModes"] == [
+        "text_to_video",
+        "first_frame",
+        "first_last_frame",
+    ]
 
 
 @pytest.mark.asyncio
@@ -6378,6 +6604,12 @@ async def test_freezone_image_models_preserves_empty_ee_catalog(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
+    import novelvideo.config as config
+
+    monkeypatch.delenv("DREAMINA_BRIDGE_URL", raising=False)
+    monkeypatch.delenv("DREAMINA_BRIDGE_TOKEN", raising=False)
+    monkeypatch.setattr(config, "DREAMINA_BRIDGE_URL", "")
+    monkeypatch.setattr(config, "DREAMINA_BRIDGE_TOKEN", "")
     _patch_freezone_project(monkeypatch, tmp_path, project="58")
 
     async def fake_catalog(media_type: str) -> list[dict[str, object]]:

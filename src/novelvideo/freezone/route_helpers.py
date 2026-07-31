@@ -26,7 +26,13 @@ from novelvideo.task_identity import task_state_key
 
 FREEZONE_DEFAULT_IMAGE_SELECTION = "newapi_gpt_image2"
 FREEZONE_DEFAULT_IMAGE_MODEL = FREEZONE_DEFAULT_IMAGE_SELECTION
-SUPPORTED_FREEZONE_IMAGE_PROVIDERS = {"huimeng", "newapi", "openrouter", "openai"}
+SUPPORTED_FREEZONE_IMAGE_PROVIDERS = {
+    "dreamina",
+    "huimeng",
+    "newapi",
+    "openrouter",
+    "openai",
+}
 FREEZONE_IMAGE_CAMERA_OPTIONS = {
     "camera_bodies": [
         {"id": "panavision_dxl2", "label": "Panavision DXL2"},

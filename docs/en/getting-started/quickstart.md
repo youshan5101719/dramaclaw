@@ -5,7 +5,7 @@
 
 > Run DramaClaw locally and produce your first result.
 
-DramaClaw is the Community Edition (CE): it runs on a single machine with no PostgreSQL / Redis required. By default `docker compose` brings up two services: `api` (the creation backend, :8780) and `web` (the browser UI, :8080). Models are served through the **DramaClaw official gateway (RelayClaw)** — paste in a DC key and you're ready to go.
+DramaClaw is the Community Edition (CE): it runs on a single machine with no PostgreSQL / Redis required. By default `docker compose` brings up two services: `api` (the creation backend, :8780) and `web` (the browser UI, :8080). Models use the **DramaClaw official gateway (RelayClaw)** by default; an existing Dreamina subscription can optionally be connected later through the authenticated macOS host bridge.
 
 ## Prerequisites
 

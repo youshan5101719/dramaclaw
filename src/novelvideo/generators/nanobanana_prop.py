@@ -30,6 +30,7 @@ from novelvideo.config import (
 )
 from novelvideo.shared.billing_errors import is_insufficient_credits_error
 from novelvideo.generators.nanobanana_grid import (
+    _call_dreamina_image_bridge,
     _call_newapi_image_api,
     _call_openai_image_api,
     clamp_image_size,
@@ -148,8 +149,12 @@ async def generate_prop_reference(
     if style is None:
         style = IMAGE_DEFAULT_STYLE
 
-    config = get_grid_generation_config()
     selected_provider, selected_model = _prop_reference_image_source(model)
+    config = (
+        get_grid_generation_config(selection_override=model)
+        if selected_provider
+        else get_grid_generation_config()
+    )
     prop_provider = (PROP_REF_IMAGE_PROVIDER or "").strip().lower()
     provider = (
         selected_provider
@@ -163,6 +168,10 @@ async def generate_prop_reference(
         api_key = gateway.api_key
         model = selected_model or resolve_prop_reference_image_model()
         base_url = gateway.base_url
+    elif provider == "dreamina":
+        api_key = config.get("api_key")
+        model = selected_model or str(config.get("model") or "").strip()
+        base_url = str(config.get("base_url") or "").strip()
     else:
         api_key = config.get("api_key")
         model = selected_model or resolve_prop_reference_image_model()
@@ -175,6 +184,8 @@ async def generate_prop_reference(
             key_name = "OPENAI_API_KEY"
         elif provider == "newapi":
             key_name = "NEWAPI_API_KEY"
+        elif provider == "dreamina":
+            key_name = "DREAMINA_BRIDGE_TOKEN"
         else:
             key_name = "GOOGLE_AI_API_KEY"
         print(f"[PropRefGen] API key not set. Set {key_name} environment variable.")
@@ -214,6 +225,14 @@ async def generate_prop_reference(
                 model=model,
                 base_url=base_url,
                 quality=config.get("openai_image_quality", "medium"),
+            )
+        elif provider == "dreamina":
+            result_path = await _generate_via_dreamina(
+                prompt=prompt,
+                output_path=output_path,
+                api_key=api_key,
+                model=model,
+                base_url=base_url,
             )
         else:
             result_path = await _generate_via_google(
@@ -381,6 +400,36 @@ async def _generate_via_newapi(
         return output_path
 
     print(f"[PropRefGen] DramaClawAPI 生成失败: {error_text or 'No response'}")
+    return None
+
+
+async def _generate_via_dreamina(
+    prompt: str,
+    output_path: str,
+    api_key: str,
+    model: str,
+    base_url: str,
+) -> Optional[str]:
+    """通过宿主机 Dreamina CLI 桥接生成道具参考图。"""
+
+    image_bytes, _text_content, error_text = await _call_dreamina_image_bridge(
+        api_key=api_key,
+        model=model,
+        prompt=prompt,
+        image_config={
+            "aspect_ratio": PROP_REF_ASPECT_RATIO,
+            "image_size": PROP_REF_IMAGE_SIZE,
+        },
+        base_url=base_url,
+    )
+
+    if image_bytes:
+        os.makedirs(os.path.dirname(output_path), exist_ok=True)
+        with open(output_path, "wb") as f:
+            f.write(image_bytes)
+        return output_path
+
+    print(f"[PropRefGen] Dreamina 生成失败: {error_text or 'No response'}")
     return None
 
 

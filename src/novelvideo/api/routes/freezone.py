@@ -239,6 +239,7 @@ from novelvideo.freezone.video_node import (
     build_freezone_omni_video_prompt,
     build_freezone_video_prompt,
     delete_video_character_library_item,
+    freezone_video_capabilities,
     get_freezone_video_model_options,
     get_video_camera_template,
     get_video_camera_templates,
@@ -1847,9 +1848,10 @@ async def _start_or_enqueue_mainline_scene_360_task(
     )
     artifact_dir = outputs_dir(project_dir, "mainline_scene_360") / job_id
     resolved_provider, resolved_model = _split_provider_and_model(
-        "newapi",
+        None,
         model or FREEZONE_DEFAULT_IMAGE_MODEL,
     )
+    resolved_provider = _resolve_freezone_image_provider(resolved_provider)
     from novelvideo.api.routes.model_credits import freezone_image_task_billing
 
     billing = freezone_image_task_billing(
@@ -6826,6 +6828,47 @@ def _catalog_entry_identifiers(entry: dict[str, Any]) -> set[str]:
     }
 
 
+def _merge_builtin_media_models(
+    catalog: list[dict[str, Any]],
+    builtins: list[dict[str, Any]],
+) -> list[dict[str, Any]]:
+    """Append configured built-ins that are absent from an EE catalog."""
+    data = list(catalog)
+    identifiers = {
+        identifier
+        for entry in data
+        for identifier in _catalog_entry_identifiers(entry)
+        if identifier
+    }
+    for entry in builtins:
+        entry_identifiers = {
+            identifier
+            for identifier in _catalog_entry_identifiers(entry)
+            if identifier
+        }
+        if identifiers.isdisjoint(entry_identifiers):
+            data.append(entry)
+            identifiers.update(entry_identifiers)
+    return data
+
+
+def _builtin_image_model_options() -> list[dict[str, Any]]:
+    data = []
+    for key, label in image_generation_selection_options().items():
+        entry = IMAGE_GENERATION_SELECTIONS.get(key, {})
+        data.append(
+            {
+                "id": key,
+                "providerId": entry.get("provider", "newapi"),
+                "provider": entry.get("provider", "newapi"),
+                "apiModel": key,
+                "api_model": key,
+                "label": label,
+            }
+        )
+    return data
+
+
 def _catalog_entry_id(entry: dict[str, Any] | None) -> str:
     if not entry:
         return ""
@@ -7018,9 +7061,13 @@ async def freezone_video_models(
     """视频处理：返回和 NovelVideo 视频模型下拉一致的可见模型。"""
     await _resolve_freezone_project(project, user, required_role="viewer")
     catalog = await _ee_media_model_catalog("video")
+    builtins = get_freezone_video_model_options()
+    if catalog is not None:
+        dreamina = [item for item in builtins if item.get("providerId") == "dreamina"]
+        catalog = _merge_builtin_media_models(catalog, dreamina)
     return {
         "ok": True,
-        "data": get_freezone_video_model_options() if catalog is None else catalog,
+        "data": builtins if catalog is None else catalog,
     }
 
 
@@ -7032,23 +7079,11 @@ async def freezone_image_models(
     """图片处理：返回和 NovelVideo 图片模型下拉一致的可见模型。"""
     await _resolve_freezone_project(project, user, required_role="viewer")
     catalog = await _ee_media_model_catalog("image")
+    builtins = _builtin_image_model_options()
     if catalog is not None:
-        return {"ok": True, "data": catalog}
-    options = image_generation_selection_options()
-    data = []
-    for key, label in options.items():
-        entry = IMAGE_GENERATION_SELECTIONS.get(key, {})
-        data.append(
-            {
-                "id": key,
-                "providerId": entry.get("provider", "newapi"),
-                "provider": entry.get("provider", "newapi"),
-                "apiModel": key,
-                "api_model": key,
-                "label": label,
-            }
-        )
-    return {"ok": True, "data": data}
+        dreamina = [item for item in builtins if item.get("providerId") == "dreamina"]
+        return {"ok": True, "data": _merge_builtin_media_models(catalog, dreamina)}
+    return {"ok": True, "data": builtins}
 
 
 @router.post(
@@ -7463,6 +7498,7 @@ async def freezone_video_gen(
         body.model_params,
         mode=body.gen_mode or "text_to_video",
     )
+    capabilities = capabilities or freezone_video_capabilities(backend)
     _require_catalog_video_mode(
         capabilities,
         body.gen_mode or "text_to_video",
@@ -7559,7 +7595,13 @@ async def freezone_video_i2v(
         body.model_params,
         mode=requested_mode,
     )
+    capabilities = capabilities or freezone_video_capabilities(backend)
     _require_catalog_video_mode(capabilities, requested_mode)
+    if backend.startswith("dreamina_") and len(body.image_urls) > 1:
+        raise HTTPException(
+            400,
+            "Dreamina accepts two images only as first/last frames; use the keyframes endpoint",
+        )
 
     reference_limits = _catalog_reference_limits(
         capabilities,
@@ -7677,6 +7719,7 @@ async def freezone_video_keyframes(
         body.model_params,
         mode=body.gen_mode or "first_last_frame",
     )
+    capabilities = capabilities or freezone_video_capabilities(backend)
     _require_catalog_video_mode(
         capabilities,
         body.gen_mode or "first_last_frame",
@@ -7791,6 +7834,7 @@ async def freezone_video_omni_gen(
         body.model_params,
         mode=body.gen_mode or "all_reference",
     )
+    capabilities = capabilities or freezone_video_capabilities(backend)
     mode_enabled = _catalog_mode_enabled(capabilities, "all_reference")
     if mode_enabled is False:
         raise HTTPException(400, "this model does not support omni reference mode")
@@ -7927,6 +7971,7 @@ async def freezone_video_edit(
         body.model_params,
         mode=body.gen_mode or "video_edit",
     )
+    capabilities = capabilities or freezone_video_capabilities(backend)
     mode_enabled = _catalog_mode_enabled(capabilities, "video_edit")
     if mode_enabled is False or (
         mode_enabled is None and not is_freezone_happyhorse_backend(backend)

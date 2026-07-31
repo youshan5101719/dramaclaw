@@ -5,7 +5,7 @@
 
 > 在 macOS / Windows / Linux 上装好 DramaClaw CE 的运行环境。只想最快跑起来,直接看 [快速开始](quickstart.md);本篇覆盖各平台前置与本地开发两种装法。
 
-DramaClaw CE 是单机服务,**无需 PostgreSQL / Redis**。Docker 默认起 `api` + `web`,模型默认走 DramaClaw 官方网关 RelayClaw;本机不跑模型,普通机器即可。想纯本地自建网关可用 `docker-compose.selfhosted.yml`。
+DramaClaw CE 是单机服务,**无需 PostgreSQL / Redis**。Docker 默认起 `api` + `web`,模型默认走 DramaClaw 官方网关 RelayClaw,普通机器即可。可选的即梦订阅渠道只需在 macOS 宿主机运行官方 CLI 与鉴权桥接,推理仍在远端完成。想本地自建网关可用 `docker-compose.selfhosted.yml`。
 
 ## 两种装法选一
 

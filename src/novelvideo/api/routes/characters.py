@@ -170,11 +170,14 @@ def _resolve_character_image_model(
 def _character_image_billing_metadata(
     model: str, *, image_role: str = "character"
 ) -> dict:
-    from novelvideo.config import IMAGE_GENERATION_SELECTIONS
+    from novelvideo.config import (
+        IMAGE_GENERATION_SELECTIONS,
+        image_generation_selection_billing_model,
+    )
 
     selection = normalize_character_image_selection(model)
     model_cfg = IMAGE_GENERATION_SELECTIONS.get(selection) or {}
-    pricing_model = str(model_cfg.get("model") or "").strip()
+    pricing_model = image_generation_selection_billing_model(selection)
     if not pricing_model:
         return {}
     from novelvideo.api.routes.model_credits import _image_selection_billing_params
@@ -189,6 +192,11 @@ def _character_image_billing_metadata(
         "pricing_params": pricing_params,
         "pricing_model_selection": selection,
         "pricing_model_label": str(model_cfg.get("label") or selection),
+        **(
+            {"provider": "dreamina"}
+            if str(model_cfg.get("provider") or "").strip() == "dreamina"
+            else {}
+        ),
     }
 
 

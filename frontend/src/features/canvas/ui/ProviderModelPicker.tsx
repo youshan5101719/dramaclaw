@@ -22,6 +22,7 @@ const MODEL_PICKER_OPTION_BASE_CLASS =
 
 export type ProviderId =
   | 'newapi'
+  | 'dreamina'
   | 'huimeng'
   | 'openrouter'
   | 'openai'
@@ -59,6 +60,7 @@ export interface ModelOption {
 
 export const SHARED_PROVIDERS: ProviderOption[] = [
   { id: 'newapi', label: '虾驿 / NewAPI' },
+  { id: 'dreamina', label: '即梦订阅 / Dreamina' },
   { id: 'huimeng', label: '绘梦 / HuiMeng' },
   { id: 'openrouter', label: 'OpenRouter' },
   { id: 'openai', label: 'OpenAI' },
@@ -90,6 +92,7 @@ export const DEFAULT_SHARED_MODEL_ID = 'huimeng/gpt-image-2';
 // Video generation models. `id` is the raw backend model id sent to
 // /freezone/video/gen so we don't need a separate apiModel mapping.
 export const VIDEO_PROVIDERS: ProviderOption[] = [
+  { id: 'dreamina', label: '即梦订阅 / Dreamina' },
   { id: 'seedance', label: 'Seedance' },
   { id: 'huimeng', label: '绘梦 / HuiMeng' },
 ];

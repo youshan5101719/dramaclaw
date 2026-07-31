@@ -176,7 +176,7 @@ Every step has its own interface — run them in order, skip steps, resume from 
 
 ## System Requirements
 
-DramaClaw runs all inference through a **remote OpenAI-compatible gateway** — nothing runs models on your machine — so the local footprint is light. An ordinary laptop or a small VPS is enough.
+DramaClaw normally runs inference through a **remote OpenAI-compatible gateway**, so the local footprint is light. The optional Dreamina subscription channel invokes the official macOS CLI through an authenticated host bridge; model inference still runs remotely.
 
 | Item | Requirement |
 |---|---|
@@ -187,7 +187,7 @@ DramaClaw runs all inference through a **remote OpenAI-compatible gateway** — 
 | **Docker** | Docker + `docker compose` |
 | **Ports** | `8080` web UI · `8780` REST API · `3000` bundled gateway (self-hosted variant only) |
 | **Datastores** | None required — no Postgres, Redis, Celery or Ray. Tasks run in-process; state lives on the local filesystem (SQLite + files) |
-| **Network** | Outbound access to the model gateway (official `relayclaw.cdnfg.com`, or your own BYO endpoint) |
+| **Network** | Outbound access to the model gateway (official `relayclaw.cdnfg.com`, or your own BYO endpoint); Dreamina also needs its optional macOS host bridge |
 
 > Local development (non-Docker) additionally needs Python 3.11–3.12 + [`uv`](https://docs.astral.sh/uv/) + `ffmpeg`. Full prerequisites in the [Self-hosting guide](docs/en/guides/self-hosting.md).
 
@@ -234,18 +234,20 @@ uv run novelvideo api --port 8780   # start the REST API (CE defaults to inline 
 
 ## Supported Models & Providers
 
-DramaClaw stays model-neutral — all text/image/video/audio models connect through a single **OpenAI-compatible gateway**, in two ways:
+DramaClaw stays model-neutral. Text, image, video, and audio models normally connect through a single **OpenAI-compatible gateway**, in two ways:
 
 - **DramaClaw official key (recommended)**: `docker compose up`, open <http://localhost:8080> → Settings → Model Config → Official, paste your DC key, save. Works instantly — no model mapping needed. Get a key at <https://relayclaw.cdnfg.com>.
 - **Bring your own gateway (BYO)**: point `NEWAPI_BASE_URL` at your own OpenAI-compatible endpoint and map model names (see [Configuring Models](docs/en/getting-started/configuring-models.md)).
+
+An optional third media channel uses an existing **Dreamina subscription account** through the official macOS CLI and a local authenticated bridge. It provides Seedream image generation and Seedance text/first-frame/first-last-frame video without routing the subscription login through NewAPI. See [Configuring Models](docs/en/getting-started/configuring-models.md#dreamina-subscription-account-optional-macos-host).
 
 > Prefer fully local? Run `docker compose -f docker-compose.selfhosted.yml up` for a bundled `newapi` gateway you configure yourself (prebuilt-image variant: `docker-compose.selfhosted.release.yml`).
 
 | Stage                | Connected via gateway                                               |
 |----------------------|---------------------------------------------------------------------|
 | **Text / LLM**       | via OpenAI-compatible gateway (DramaClaw official key, or BYO)      |
-| **Image**            | gpt-image · nano-banana                                             |
-| **Video**            | Seedance 1.0 / 1.5 / 2.0 series · happyhorse                        |
+| **Image**            | gpt-image · nano-banana · optional Dreamina Seedream subscription     |
+| **Video**            | Seedance 1.0 / 1.5 / 2.0 · happyhorse · optional Dreamina subscription |
 | **Voice-over**       | IndexTTS2                                                           |
 | **Story graph**      | Cognee                                                             |
 | **Task runtime**     | in-process inline (no Ray / Redis / Celery)                        |

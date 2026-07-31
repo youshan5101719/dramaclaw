@@ -97,7 +97,7 @@ const ZOOM_LEVELS: MultiAngleZoomLevel[] = [
   'extreme_wide',
 ];
 
-export type MultiAngleProviderId = 'huimeng' | 'openrouter' | 'openai';
+export type MultiAngleProviderId = 'dreamina' | 'huimeng' | 'newapi' | 'openrouter' | 'openai';
 
 export const MULTI_ANGLE_IMAGE_SIZES = ['1K', '2K', '4K'] as const;
 export type MultiAngleImageSize = (typeof MULTI_ANGLE_IMAGE_SIZES)[number];

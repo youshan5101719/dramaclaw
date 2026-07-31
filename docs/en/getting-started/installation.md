@@ -5,7 +5,7 @@
 
 > Set up the runtime environment for DramaClaw CE on macOS / Windows / Linux. If you just want the fastest path to running it, go straight to [Quickstart](quickstart.md); this guide covers per-platform prerequisites and the two installation methods (Docker and local development).
 
-DramaClaw CE is a single-machine service that needs **no PostgreSQL / Redis**. By default Docker brings up `api` + `web`, and models are served through the DramaClaw official gateway RelayClaw; nothing runs models on your machine, so an ordinary machine is enough. If you want to self-host a fully local gateway, use `docker-compose.selfhosted.yml`.
+DramaClaw CE is a single-machine service that needs **no PostgreSQL / Redis**. By default Docker brings up `api` + `web`, and models are served through the DramaClaw official gateway RelayClaw; an ordinary machine is enough. An optional Dreamina subscription channel runs only the official CLI and authenticated bridge on a macOS host while inference remains remote. If you want to self-host a local gateway, use `docker-compose.selfhosted.yml`.
 
 ## Pick one of two installation methods
 

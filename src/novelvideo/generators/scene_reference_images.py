@@ -24,6 +24,7 @@ from novelvideo.config import (
     SCENE_REVERSE_MASTER_IMAGE_PROVIDER,
 )
 from novelvideo.generators.nanobanana_grid import (
+    _call_dreamina_image_bridge,
     _call_huimeng_image_api,
     _call_newapi_image_api,
     _call_openai_image_api,
@@ -560,6 +561,10 @@ def _scene_image_model(
         if kind in {"master", "reverse_master"}:
             return NEWAPI_NANOBANANA2_MODEL
         return SCENE_ASSET_MODEL or NEWAPI_IMAGE_MODEL
+    if provider == "dreamina":
+        from novelvideo.config import DREAMINA_IMAGE_MODEL
+
+        return DREAMINA_IMAGE_MODEL
     if provider == "openai":
         return SCENE_ASSET_MODEL or os.environ.get("SCENE_ASSET_OPENAI_MODEL") or OPENAI_IMAGE_MODEL
     if provider in {"huimeng", "huimengi"}:
@@ -680,6 +685,22 @@ async def generate_scene_reference_image(
             reference_images=references or None,
             image_config=_scene_image_config(selected_model),
             base_url=base_url,
+        )
+    elif provider == "dreamina":
+        from novelvideo.config import get_grid_generation_config
+
+        selected_model = _scene_image_model(kind, provider, model)
+        config = get_grid_generation_config(
+            provider_override="dreamina",
+            model_override=selected_model,
+        )
+        image_bytes, _text, error = await _call_dreamina_image_bridge(
+            api_key=str(config.get("api_key") or ""),
+            model=selected_model,
+            prompt=prompt,
+            reference_images=references or None,
+            image_config=_scene_image_config(selected_model),
+            base_url=str(config.get("base_url") or ""),
         )
     elif provider in {"huimeng", "huimengi"}:
         api_key = HUIMENGI_API_KEY or ""

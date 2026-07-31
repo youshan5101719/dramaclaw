@@ -52,6 +52,40 @@ def test_dreamina_video_backend_creates_subscription_generator(monkeypatch) -> N
     assert generator.model == "seedance2.0fast"
 
 
+@pytest.mark.asyncio
+async def test_dreamina_video_generator_writes_bridge_result(
+    monkeypatch, tmp_path: Path
+) -> None:
+    monkeypatch.setenv("DREAMINA_BRIDGE_URL", "http://bridge.test")
+    monkeypatch.setenv("DREAMINA_BRIDGE_TOKEN", "t" * 32)
+
+    from novelvideo.generators.video_generator import DreaminaSubscriptionVideoGenerator
+
+    generator = DreaminaSubscriptionVideoGenerator()
+    calls: list[dict] = []
+
+    async def fake_generate_video(**kwargs):
+        calls.append(kwargs)
+        return b"generated-video", "submit-video-123"
+
+    monkeypatch.setattr(generator.client, "generate_video", fake_generate_video)
+    output = tmp_path / "dreamina.mp4"
+
+    result = await generator.generate(
+        image_path=None,
+        prompt="camera pushes forward",
+        output_path=str(output),
+        duration=99,
+    )
+
+    assert result.status.value == "done"
+    assert result.task_id == "submit-video-123"
+    assert result.provider_task_id == "submit-video-123"
+    assert result.duration_seconds == 15
+    assert calls[0]["duration"] == 15
+    assert output.read_bytes() == b"generated-video"
+
+
 def test_host_bridge_builds_allowlisted_image_command(tmp_path: Path) -> None:
     from novelvideo.dreamina_host_bridge import DreaminaTaskRequest, build_submit_command
 
@@ -362,6 +396,49 @@ async def test_dreamina_character_generation_routes_plain_and_reference_images(
         ("portrait.jpg", b"portrait-bytes", "image/jpeg"),
         ("costume.png", b"costume-bytes", "image/png"),
     ]
+
+
+@pytest.mark.asyncio
+async def test_dreamina_scene_reference_uses_host_bridge(
+    monkeypatch,
+    tmp_path: Path,
+) -> None:
+    from novelvideo.generators import scene_reference_images
+    from novelvideo.models import NovelScene
+
+    captured = {}
+
+    async def fake_dreamina_call(**kwargs):
+        captured.update(kwargs)
+        return b"scene-master", "", ""
+
+    monkeypatch.setenv("DREAMINA_BRIDGE_URL", "http://bridge.test")
+    monkeypatch.setenv("DREAMINA_BRIDGE_TOKEN", "t" * 32)
+    monkeypatch.setattr(
+        scene_reference_images,
+        "_call_dreamina_image_bridge",
+        fake_dreamina_call,
+    )
+    scene = NovelScene(
+        name="大厅",
+        scene_type="interior",
+        environment_prompt="挑高大厅，正面是一扇落地窗",
+    )
+
+    output = await scene_reference_images.generate_scene_reference_image(
+        project_dir=tmp_path,
+        scene=scene,
+        kind="master",
+        provider="dreamina",
+        model="5.0",
+    )
+
+    assert output.read_bytes() == b"scene-master"
+    assert captured["base_url"] == "http://bridge.test"
+    assert captured["api_key"] == "t" * 32
+    assert captured["model"] == "5.0"
+    assert captured["reference_images"] is None
+    assert captured["image_config"]["aspect_ratio"] == "16:9"
 
 
 def test_dreamina_gateway_routes_proxy_login_without_exposing_token(

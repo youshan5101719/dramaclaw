@@ -3,7 +3,7 @@
 
 # 架构
 
-DramaClaw 社区版（CE）是一条**单机运行**的「小说 → 成片」流水线：一个 FastAPI 服务承载全部创作能力，任务在进程内执行，数据落本地，模型经一个 OpenAI 兼容网关接入。**无需 PostgreSQL / Redis。**
+DramaClaw 社区版（CE）是一条**单机运行**的「小说 → 成片」流水线：一个 FastAPI 服务承载全部创作能力，任务在进程内执行，数据落本地。模型通常经 OpenAI 兼容网关接入；可选的即梦订阅渠道通过鉴权宿主桥接调用 macOS 上的官方 Dreamina CLI。**无需 PostgreSQL / Redis。**
 
 ## 系统架构
 
@@ -75,7 +75,7 @@ CE 固定**单本地用户**，项目数据全部在本地：
 
 ## 模型接入
 
-所有文本 / 图片 / 视频 / 音频模型经一个 **OpenAI 兼容网关**接入（自带网关或官方 key），详见[配置模型供应商](../getting-started/configuring-models.md)。
+文本 / 图片 / 视频 / 音频模型通常经 **OpenAI 兼容网关**接入（官方 RelayClaw 或自带网关）。可选的即梦订阅渠道是独立图片 / 视频后端，通过鉴权宿主桥接调用 macOS 上的官方 Dreamina CLI，详见[配置模型供应商](../getting-started/configuring-models.md)。
 
 ## 技术栈
 

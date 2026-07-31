@@ -5,7 +5,7 @@
 
 > 本地跑起 DramaClaw,产出第一个结果。
 
-DramaClaw 是社区版(CE),单机运行、无需 PostgreSQL / Redis。默认 `docker compose` 起两个服务:`api`(创作后端,:8780)与 `web`(浏览器界面,:8080);模型走 **DramaClaw 官方网关(RelayClaw)**,填一个 DC key 即用。
+DramaClaw 是社区版(CE),单机运行、无需 PostgreSQL / Redis。默认 `docker compose` 起两个服务:`api`(创作后端,:8780)与 `web`(浏览器界面,:8080);模型默认走 **DramaClaw 官方网关(RelayClaw)**,也可稍后通过鉴权 macOS 宿主桥接接入已有即梦订阅账号。
 
 ## 前置
 

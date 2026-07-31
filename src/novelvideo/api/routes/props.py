@@ -292,9 +292,18 @@ async def generate_prop_reference(
             _prop_reference_image_source,
             resolve_prop_reference_image_model,
         )
+        from novelvideo.config import (
+            image_generation_selection_billing_model,
+            normalize_image_generation_selection,
+        )
 
-        _, selected_model = _prop_reference_image_source(model)
-        pricing_model = selected_model or resolve_prop_reference_image_model()
+        selected_provider, selected_model = _prop_reference_image_source(model)
+        selection = normalize_image_generation_selection(model) if model else ""
+        pricing_model = (
+            image_generation_selection_billing_model(selection)
+            if selection
+            else selected_model or resolve_prop_reference_image_model()
+        )
         queued = await get_task_backend().enqueue_project_task(
             ctx,
             task_type="prop_reference_asset",
@@ -311,6 +320,11 @@ async def generate_prop_reference(
                     "pricing_model": pricing_model,
                     "pricing_params": _fixed_image_billing_params(
                         "prop_reference", model=pricing_model
+                    ),
+                    **(
+                        {"provider": "dreamina"}
+                        if selected_provider == "dreamina"
+                        else {}
                     ),
                 },
             },
@@ -351,6 +365,10 @@ async def batch_generate_prop_references(
             _prop_reference_image_source,
             resolve_prop_reference_image_model,
         )
+        from novelvideo.config import (
+            image_generation_selection_billing_model,
+            normalize_image_generation_selection,
+        )
 
         store = await make_sqlite_store_for_context(ctx)
         props = await store.list_props()
@@ -361,8 +379,13 @@ async def batch_generate_prop_references(
         )
         if pending_count <= 0:
             return {"ok": False, "error": "所有道具均已生成参考图"}
-        _, selected_model = _prop_reference_image_source(model)
-        pricing_model = selected_model or resolve_prop_reference_image_model()
+        selected_provider, selected_model = _prop_reference_image_source(model)
+        selection = normalize_image_generation_selection(model) if model else ""
+        pricing_model = (
+            image_generation_selection_billing_model(selection)
+            if selection
+            else selected_model or resolve_prop_reference_image_model()
+        )
         queued = await get_task_backend().enqueue_project_task(
             ctx,
             task_type="batch_prop_ref",
@@ -378,6 +401,11 @@ async def batch_generate_prop_references(
                     "pricing_model": pricing_model,
                     "pricing_params": _fixed_image_billing_params(
                         "prop_reference", model=pricing_model
+                    ),
+                    **(
+                        {"provider": "dreamina"}
+                        if selected_provider == "dreamina"
+                        else {}
                     ),
                 },
             },

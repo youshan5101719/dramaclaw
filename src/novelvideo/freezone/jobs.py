@@ -7,7 +7,7 @@ Provider selection (since v1.1):
 - `provider` / `model` / `quality` get threaded into
   `get_grid_generation_config(provider_override=, model_override=)` for the
           image generation/edit path so the caller can pick the supported SuperTale
-          providers: `newapi` / `huimeng` / `openrouter` / `openai`.
+          providers: `newapi` / `dreamina` / `huimeng` / `openrouter` / `openai`.
 - A legacy `provider="volcengine"` branch remains for old canvases/scripts, but
   the Freezone UI no longer exposes it.
 """
@@ -1161,6 +1161,7 @@ async def run_freezone_video_gen(
     from novelvideo.generators.video_generator import (
         ShotReference,
         create_video_generator,
+        parse_dreamina_video_backend,
         parse_newapi_video_backend,
     )
 
@@ -1199,6 +1200,7 @@ async def run_freezone_video_gen(
             (first_image_ref is None or not first_image_ref.path)
             and not str(backend).startswith("huimeng_")
             and not parse_newapi_video_backend(backend)
+            and not parse_dreamina_video_backend(backend)
             and not is_freezone_seedance2_backend(backend)
         ):
             raise RuntimeError(f"backend {backend} requires a first-frame image reference")

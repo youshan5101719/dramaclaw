@@ -1093,6 +1093,99 @@ async def test_generation_credit_cost_route_resolves_huimeng_video_backend_label
 
 
 @pytest.mark.asyncio
+async def test_generation_credit_cost_route_keeps_dreamina_subscription_identity(
+    monkeypatch,
+):
+    from novelvideo.api.routes import model_credits
+
+    patch_quote(
+        monkeypatch,
+        model_credits,
+        expected_model="dreamina_seedance2.0fast",
+        cost=0,
+    )
+
+    result = await model_credits.get_generation_credit_cost(
+        kind="video_backend",
+        value="dreamina_seedance2.0fast",
+        user={"user_id": "usr_1"},
+    )
+
+    assert result == {"ok": True, "data": {"cost": 0, "display": "0"}}
+
+
+@pytest.mark.asyncio
+async def test_generation_credit_cost_route_keeps_dreamina_image_identity(
+    monkeypatch,
+):
+    from novelvideo.api.routes import model_credits
+
+    monkeypatch.setenv("DREAMINA_BRIDGE_URL", "http://bridge.test")
+    monkeypatch.setenv("DREAMINA_BRIDGE_TOKEN", "t" * 32)
+    patch_quote(
+        monkeypatch,
+        model_credits,
+        expected_model="dreamina_5.0",
+        cost=0,
+    )
+
+    result = await model_credits.get_generation_credit_cost(
+        kind="image_selection",
+        value="dreamina_subscription",
+        user={"user_id": "usr_1"},
+    )
+
+    assert result == {"ok": True, "data": {"cost": 0, "display": "0"}}
+
+
+def test_dreamina_image_feature_billing_uses_subscription_provider_metadata(
+    monkeypatch,
+):
+    from novelvideo.api.routes.model_credits import (
+        freezone_image_generate_billing_params,
+    )
+
+    monkeypatch.setenv("DREAMINA_BRIDGE_URL", "http://bridge.test")
+    monkeypatch.setenv("DREAMINA_BRIDGE_TOKEN", "t" * 32)
+    billing = freezone_image_generate_billing_params(
+        {
+            "image_selection": "dreamina_subscription",
+            "size": "2K",
+        }
+    )
+
+    assert billing["pricing_model"] == "dreamina_5.0"
+    assert billing["pricing_model_selection"] == "dreamina_subscription"
+    assert billing["provider"] == "dreamina"
+
+
+def test_dreamina_video_feature_billing_uses_subscription_provider_metadata():
+    from novelvideo.api.routes.model_credits import (
+        _video_backend_feature_billing_params,
+    )
+
+    billing = _video_backend_feature_billing_params(
+        {
+            "video_backend": "dreamina_seedance2.0fast",
+            "resolution": "720p",
+            "pricing_quantity": 99,
+        }
+    )
+
+    assert billing == {
+        "video_backend": "dreamina_seedance2.0fast",
+        "resolution": "720p",
+        "pricing_quantity": 15,
+        "pricing_kind": "video",
+        "pricing_model": "dreamina_seedance2.0fast",
+        "pricing_params": {"resolution": "720p"},
+        "pricing_model_selection": "dreamina_seedance2.0fast",
+        "provider": "dreamina",
+        "pricing_model_label": "即梦订阅账号（Seedance 2.0 Fast）",
+    }
+
+
+@pytest.mark.asyncio
 async def test_generation_credit_cost_route_keeps_legacy_video_backend_values(
     monkeypatch,
 ):

@@ -219,13 +219,14 @@ def _image_selection_billing_metadata(
 ) -> dict:
     from novelvideo.config import (
         IMAGE_GENERATION_SELECTIONS,
+        image_generation_selection_billing_model,
         normalize_image_generation_selection,
     )
     from novelvideo.api.routes.model_credits import _image_selection_billing_params
 
     selection = normalize_image_generation_selection(image_selection)
     model_cfg = IMAGE_GENERATION_SELECTIONS.get(selection) or {}
-    pricing_model = str(model_cfg.get("model") or "").strip()
+    pricing_model = image_generation_selection_billing_model(selection)
     if not pricing_model:
         return {}
     pricing_params = _image_selection_billing_params(
@@ -240,6 +241,11 @@ def _image_selection_billing_metadata(
         "pricing_params": pricing_params,
         "pricing_model_selection": selection,
         "pricing_model_label": str(model_cfg.get("label") or selection),
+        **(
+            {"provider": "dreamina"}
+            if str(model_cfg.get("provider") or "").strip() == "dreamina"
+            else {}
+        ),
     }
 
 
@@ -1564,18 +1570,17 @@ async def trim_seedance2_audio_asset(
 
 def _api_video_backend_options() -> list[VideoBackendOption]:
     from novelvideo.config import NEWAPI_VIDEO_DURATION_BOUNDS
+    from novelvideo.freezone.video_node import DREAMINA_VIDEO_SUPPORTED_MODES
     from novelvideo.generators.video_generator import (
         NewApiVideoGenerator,
+        dreamina_video_backend_options,
         newapi_video_backend_options,
         parse_newapi_video_backend,
     )
 
     options = newapi_video_backend_options(include_seedance2_variants=True)
     options.setdefault("newapi_happyhorse-1.0", "HappyHorse 1.0")
-    from novelvideo.dreamina_bridge import DreaminaBridgeConfig
-
-    if DreaminaBridgeConfig.from_env().configured:
-        options["dreamina_seedance2.0fast"] = "即梦订阅账号（Seedance 2.0 Fast）"
+    options.update(dreamina_video_backend_options())
     duration_bounds = NewApiVideoGenerator._parse_duration_bounds_config(
         NEWAPI_VIDEO_DURATION_BOUNDS
     )
@@ -1604,7 +1609,9 @@ def _api_video_backend_options() -> list[VideoBackendOption]:
                 min_duration=bounds[0] if bounds else None,
                 max_duration=bounds[1] if bounds else None,
                 resolution_options=(
-                    list(HAPPYHORSE_RESOLUTION_OPTIONS)
+                    ["720p"]
+                    if value.startswith("dreamina_")
+                    else list(HAPPYHORSE_RESOLUTION_OPTIONS)
                     if is_happyhorse
                     else list(GROK_VIDEO_RESOLUTION_OPTIONS)
                     if is_grok_video
@@ -1618,15 +1625,35 @@ def _api_video_backend_options() -> list[VideoBackendOption]:
                     else None
                 ),
                 supported_modes=(
-                    list(HAPPYHORSE_SUPPORTED_MODES)
+                    list(DREAMINA_VIDEO_SUPPORTED_MODES)
+                    if value.startswith("dreamina_")
+                    else list(HAPPYHORSE_SUPPORTED_MODES)
                     if is_happyhorse
                     else list(GROK_VIDEO_SUPPORTED_MODES)
                     if is_grok_video
                     else None
                 ),
-                reference_image_max=7 if is_grok_video else 9 if is_happyhorse else None,
-                reference_video_max=0 if is_grok_video else 1 if is_happyhorse else None,
-                reference_audio_max=0 if is_grok_video or is_happyhorse else None,
+                reference_image_max=(
+                    2
+                    if value.startswith("dreamina_")
+                    else 7
+                    if is_grok_video
+                    else 9
+                    if is_happyhorse
+                    else None
+                ),
+                reference_video_max=(
+                    0
+                    if value.startswith("dreamina_") or is_grok_video
+                    else 1
+                    if is_happyhorse
+                    else None
+                ),
+                reference_audio_max=(
+                    0
+                    if value.startswith("dreamina_") or is_grok_video or is_happyhorse
+                    else None
+                ),
             )
         )
     return backend_options

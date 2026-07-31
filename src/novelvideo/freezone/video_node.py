@@ -118,6 +118,12 @@ FREEZONE_NEWAPI_VIDEO_BACKENDS = {
     "newapi_happyhorse-1.0",
 }
 FREEZONE_DISABLED_VIDEO_BACKENDS = {"newapi_grok-video-channel"}
+DREAMINA_VIDEO_RESOLUTION_OPTIONS = ("720p",)
+DREAMINA_VIDEO_SUPPORTED_MODES = (
+    "text_to_video",
+    "first_frame",
+    "first_last_frame",
+)
 
 
 def get_video_camera_templates() -> list[dict[str, str]]:
@@ -161,13 +167,15 @@ FREEZONE_GROK_VIDEO_CHANNEL_RESOLUTION_OPTIONS = ("720p", "480p")
 
 def _freezone_video_model_from_backend(backend: str | None) -> str:
     text = str(backend or "").strip().lower()
-    for prefix in ("newapi_", "huimeng_", "huimengi_"):
+    for prefix in ("newapi_", "huimeng_", "huimengi_", "dreamina_"):
         if text.startswith(prefix):
             return text[len(prefix) :].strip()
     return text
 
 
 def freezone_video_resolution_options(backend: str | None) -> tuple[str, ...]:
+    if str(backend or "").strip().lower().startswith("dreamina_"):
+        return DREAMINA_VIDEO_RESOLUTION_OPTIONS
     model = _freezone_video_model_from_backend(backend)
     if model == "grok-video-channel":
         return FREEZONE_GROK_VIDEO_CHANNEL_RESOLUTION_OPTIONS
@@ -255,14 +263,28 @@ def _freezone_newapi_video_options() -> dict[str, str]:
     return ordered
 
 
+def _freezone_dreamina_video_options() -> dict[str, str]:
+    from novelvideo.generators.video_generator import dreamina_video_backend_options
+
+    return dreamina_video_backend_options()
+
+
+def _freezone_video_options() -> dict[str, str]:
+    return {
+        **_freezone_newapi_video_options(),
+        **_freezone_dreamina_video_options(),
+    }
+
+
 def get_freezone_video_model_options() -> list[dict[str, Any]]:
     data: list[dict[str, Any]] = []
-    for backend, label in _freezone_newapi_video_options().items():
+    for backend, label in _freezone_video_options().items():
         duration_bounds = freezone_video_duration_bounds(backend)
+        is_dreamina = backend.startswith("dreamina_")
         item = {
             "id": backend,
-            "providerId": "newapi",
-            "provider": "newapi",
+            "providerId": "dreamina" if is_dreamina else "newapi",
+            "provider": "dreamina" if is_dreamina else "newapi",
             "apiModel": backend,
             "api_model": backend,
             "label": label,
@@ -274,6 +296,19 @@ def get_freezone_video_model_options() -> list[dict[str, Any]]:
             "maxDuration": duration_bounds[1],
             "max_duration": duration_bounds[1],
         }
+        if is_dreamina:
+            item.update(
+                {
+                    "supportedModes": list(DREAMINA_VIDEO_SUPPORTED_MODES),
+                    "supported_modes": list(DREAMINA_VIDEO_SUPPORTED_MODES),
+                    "referenceImageMax": 2,
+                    "reference_image_max": 2,
+                    "referenceVideoMax": 0,
+                    "reference_video_max": 0,
+                    "referenceAudioMax": 0,
+                    "reference_audio_max": 0,
+                }
+            )
         if is_freezone_seedance2_value_backend(backend):
             item.update(
                 {
@@ -288,12 +323,30 @@ def get_freezone_video_model_options() -> list[dict[str, Any]]:
 
 
 def get_freezone_video_model_names() -> list[str]:
-    return list(_freezone_newapi_video_options().keys())
+    return list(_freezone_video_options().keys())
+
+
+def freezone_video_capabilities(backend: str | None) -> dict[str, Any] | None:
+    """Return built-in CE capability metadata for provider-specific backends."""
+    if not str(backend or "").strip().lower().startswith("dreamina_"):
+        return None
+    min_duration, max_duration = freezone_video_duration_bounds(backend)
+    return {
+        "providerId": "dreamina",
+        "provider": "dreamina",
+        "resolutionOptions": list(DREAMINA_VIDEO_RESOLUTION_OPTIONS),
+        "supportedModes": list(DREAMINA_VIDEO_SUPPORTED_MODES),
+        "referenceImageMax": 2,
+        "referenceVideoMax": 0,
+        "referenceAudioMax": 0,
+        "minDuration": min_duration,
+        "maxDuration": max_duration,
+    }
 
 
 def resolve_freezone_video_backend(model: str | None) -> str:
     text = str(model or "").strip()
-    options = _freezone_newapi_video_options()
+    options = _freezone_video_options()
     if not text:
         return (
             FREEZONE_DEFAULT_VIDEO_BACKEND
@@ -317,10 +370,15 @@ def resolve_freezone_video_backend(model: str | None) -> str:
     if label_alias:
         return label_alias
 
-    from novelvideo.generators.video_generator import parse_newapi_video_backend
+    from novelvideo.generators.video_generator import (
+        parse_dreamina_video_backend,
+        parse_newapi_video_backend,
+    )
 
     if parse_newapi_video_backend(text) and text not in FREEZONE_DISABLED_VIDEO_BACKENDS:
         return text
+    if parse_dreamina_video_backend(text):
+        raise ValueError(f"unknown video model: {text}")
     raise ValueError(f"unknown video model: {text}")
 
 

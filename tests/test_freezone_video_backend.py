@@ -19,6 +19,7 @@ from novelvideo.freezone.video_node import (
     build_freezone_omni_video_prompt,
     build_freezone_video_prompt,
     delete_video_character_library_item,
+    freezone_video_capabilities,
     get_freezone_video_model_names,
     get_freezone_video_model_options,
     get_video_camera_template,
@@ -147,7 +148,11 @@ def test_build_freezone_keyframe_video_prompt_handles_first_and_last_frame() -> 
     assert "老人" in prompt
 
 
-def test_video_model_options_and_resolution_work() -> None:
+def test_video_model_options_and_resolution_work(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.delenv("DREAMINA_BRIDGE_URL", raising=False)
+    monkeypatch.delenv("DREAMINA_BRIDGE_TOKEN", raising=False)
     names = get_freezone_video_model_names()
     options = get_freezone_video_model_options()
     ids = {item["id"] for item in options}
@@ -175,6 +180,84 @@ def test_video_model_options_and_resolution_work() -> None:
     assert happyhorse["minDuration"] == 3
     assert happyhorse["maxDuration"] == 15
     assert normalize_video_resolution_for_backend("newapi_happyhorse-1.0", "480p") == "720p"
+
+
+def test_dreamina_video_model_exposes_only_supported_freezone_capabilities(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("DREAMINA_BRIDGE_URL", "http://bridge.test")
+    monkeypatch.setenv("DREAMINA_BRIDGE_TOKEN", "t" * 32)
+
+    options = get_freezone_video_model_options()
+    dreamina = next(
+        item for item in options if item["id"] == "dreamina_seedance2.0fast"
+    )
+
+    assert dreamina["providerId"] == "dreamina"
+    assert dreamina["resolutionOptions"] == ["720p"]
+    assert dreamina["minDuration"] == 4
+    assert dreamina["maxDuration"] == 15
+    assert dreamina["supportedModes"] == [
+        "text_to_video",
+        "first_frame",
+        "first_last_frame",
+    ]
+    assert dreamina["referenceImageMax"] == 2
+    assert dreamina["referenceVideoMax"] == 0
+    assert dreamina["referenceAudioMax"] == 0
+    assert resolve_freezone_video_backend(dreamina["label"]) == dreamina["id"]
+    assert normalize_video_resolution_for_backend(dreamina["id"], "1080p") == "720p"
+    assert normalize_video_duration_for_backend(dreamina["id"], 1) == 4
+    assert normalize_video_duration_for_backend(dreamina["id"], 99) == 15
+    assert freezone_video_capabilities(dreamina["id"]) == {
+        "providerId": "dreamina",
+        "provider": "dreamina",
+        "resolutionOptions": ["720p"],
+        "supportedModes": ["text_to_video", "first_frame", "first_last_frame"],
+        "referenceImageMax": 2,
+        "referenceVideoMax": 0,
+        "referenceAudioMax": 0,
+        "minDuration": 4,
+        "maxDuration": 15,
+    }
+    assert not is_freezone_seedance2_backend(dreamina["id"])
+
+
+def test_dreamina_video_model_is_hidden_without_bridge(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.delenv("DREAMINA_BRIDGE_URL", raising=False)
+    monkeypatch.delenv("DREAMINA_BRIDGE_TOKEN", raising=False)
+
+    assert "dreamina_seedance2.0fast" not in get_freezone_video_model_names()
+    with pytest.raises(ValueError, match="unknown video model"):
+        resolve_freezone_video_backend("dreamina_seedance2.0fast")
+
+
+def test_mainline_dreamina_video_option_exposes_subscription_constraints(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from novelvideo.api.routes import generation
+
+    monkeypatch.setenv("DREAMINA_BRIDGE_URL", "http://bridge.test")
+    monkeypatch.setenv("DREAMINA_BRIDGE_TOKEN", "t" * 32)
+
+    option = next(
+        item
+        for item in generation._api_video_backend_options()
+        if item.value == "dreamina_seedance2.0fast"
+    )
+
+    assert option.resolution_options == ["720p"]
+    assert (option.min_duration, option.max_duration) == (4, 15)
+    assert option.supported_modes == [
+        "text_to_video",
+        "first_frame",
+        "first_last_frame",
+    ]
+    assert option.reference_image_max == 2
+    assert option.reference_video_max == 0
+    assert option.reference_audio_max == 0
 
 
 def test_catalog_resolution_options_override_legacy_video_whitelist() -> None:
@@ -309,6 +392,42 @@ async def test_freezone_video_gen_allows_newapi_seedance2_text_to_video(
     assert captured["create"]["backend"] == "newapi_seedance-2.0-fast"
     assert captured["generate"]["image_path"] is None
     assert captured["generate"]["references"] == []
+
+
+@pytest.mark.asyncio
+async def test_freezone_video_gen_allows_dreamina_text_to_video(
+    monkeypatch, tmp_path: Path
+):
+    captured: dict[str, dict] = {}
+
+    class FakeVideoGenerator:
+        async def generate(self, **kwargs):
+            captured["generate"] = kwargs
+            output_path = Path(kwargs["output_path"])
+            output_path.parent.mkdir(parents=True, exist_ok=True)
+            output_path.write_bytes(b"fake mp4")
+            return VideoGenResult(status=VideoGenStatus.DONE, video_path=str(output_path))
+
+    def fake_create_video_generator(**kwargs):
+        captured["create"] = kwargs
+        return FakeVideoGenerator()
+
+    monkeypatch.setattr(
+        "novelvideo.generators.video_generator.create_video_generator",
+        fake_create_video_generator,
+    )
+
+    out = await run_freezone_video_gen(
+        project_dir=tmp_path,
+        job_id="job_dreamina_t2v",
+        prompt="rainy street",
+        reference_items=[],
+        backend="dreamina_seedance2.0fast",
+    )
+
+    assert out.exists()
+    assert captured["create"]["backend"] == "dreamina_seedance2.0fast"
+    assert captured["generate"]["image_path"] is None
 
 
 @pytest.mark.asyncio

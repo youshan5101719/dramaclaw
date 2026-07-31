@@ -5,7 +5,29 @@
 
 > Configure the official RelayClaw channel or the local NewAPI bundled with CE.
 
-DramaClaw CE connects text, image, video, audio, and embedding models through an OpenAI-compatible NewAPI gateway. Channel selection, gateway address, and runtime token are saved from the web UI to local `settings.db`; CE does not read them from environment variables.
+DramaClaw CE connects text, image, video, audio, and embedding models through an OpenAI-compatible NewAPI gateway. The optional Dreamina subscription channel is a separate media backend that uses the official Dreamina CLI instead of NewAPI. NewAPI channel selection, gateway address, and runtime token are saved from the web UI to local `settings.db`.
+
+## Dreamina subscription account (optional, macOS host)
+
+If you already have a Dreamina membership, DramaClaw can use its subscription credits for Seedream 5.0 images and Seedance 2.0 Fast videos. The official `dreamina` CLI runs on macOS, while the API normally runs in Linux Docker, so start the authenticated host bridge first:
+
+```bash
+# Generate a random token with at least 32 characters and put the same value in .env.
+export DREAMINA_BRIDGE_TOKEN="your-long-random-token"
+uv run dramaclaw-dreamina-bridge --host 0.0.0.0 --port 8791
+```
+
+Configure the project `.env`:
+
+```bash
+DREAMINA_BRIDGE_URL=http://host.docker.internal:8791
+DREAMINA_BRIDGE_TOKEN=the-same-long-random-token
+DREAMINA_IMAGE_MODEL=5.0
+```
+
+Restart DramaClaw, then open Settings → Model Configuration → Dreamina Subscription and complete the official device-code login. The channel supports text-to-image, image-to-image, text-to-video, first-frame video, and first/last-frame video. Dreamina video output is currently limited to 720p and 4–15 seconds.
+
+The bridge accepts only allowlisted Dreamina operations and parameters, uses Bearer authentication, and never copies OAuth tokens, cookies, or CLI login files into DramaClaw or the Git repository. Bind to `0.0.0.0` only so Docker Desktop can reach it through `host.docker.internal`; do not expose port 8791 to the public internet.
 
 ## A. DC official key (recommended, simplest)
 

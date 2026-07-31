@@ -227,10 +227,11 @@ class DreaminaSubscriptionVideoGenerator(VideoGeneratorBase):
             "3:2": "16:9",
         }.get(aspect_ratio, aspect_ratio)
         try:
+            normalized_duration = max(4, min(15, round(duration)))
             video_bytes, submit_id = await self.client.generate_video(
                 prompt=prompt,
                 ratio=ratio,
-                duration=max(4, min(15, round(duration))),
+                duration=normalized_duration,
                 image_path=image_path,
                 last_frame_path=last_frame_path,
                 model=self.model,
@@ -243,7 +244,8 @@ class DreaminaSubscriptionVideoGenerator(VideoGeneratorBase):
                 status=VideoGenStatus.DONE,
                 video_path=str(target),
                 task_id=submit_id,
-                duration_seconds=float(duration),
+                provider_task_id=submit_id,
+                duration_seconds=float(normalized_duration),
             )
         except Exception as exc:
             return VideoGenResult(status=VideoGenStatus.FAILED, error=str(exc))
@@ -3562,6 +3564,10 @@ NEWAPI_MAINLINE_SEEDANCE2_MODELS = (
     "seedance-2.0-fast-value",
 )
 NEWAPI_DISABLED_VIDEO_MODELS = {"grok-video-channel"}
+DREAMINA_VIDEO_BACKEND_PREFIX = "dreamina_"
+DREAMINA_VIDEO_DISPLAY_LABELS = {
+    "seedance2.0fast": "即梦订阅账号（Seedance 2.0 Fast）",
+}
 
 
 def parse_newapi_video_backend(backend: str | None) -> str | None:
@@ -3579,9 +3585,22 @@ def parse_newapi_video_backend(backend: str | None) -> str | None:
 
 def parse_dreamina_video_backend(backend: str | None) -> str | None:
     value = str(backend or "").strip().lower()
-    if value.startswith("dreamina_"):
-        return value.removeprefix("dreamina_").strip() or None
+    if value.startswith(DREAMINA_VIDEO_BACKEND_PREFIX):
+        return value.removeprefix(DREAMINA_VIDEO_BACKEND_PREFIX).strip() or None
     return None
+
+
+def dreamina_video_backend_options(*, configured_only: bool = True) -> dict[str, str]:
+    """Return the allowlisted subscription video backends exposed to users."""
+    if configured_only:
+        from novelvideo.dreamina_bridge import DreaminaBridgeConfig
+
+        if not DreaminaBridgeConfig.from_env().configured:
+            return {}
+    return {
+        f"{DREAMINA_VIDEO_BACKEND_PREFIX}{model}": label
+        for model, label in DREAMINA_VIDEO_DISPLAY_LABELS.items()
+    }
 
 
 def newapi_video_backend_options(*, include_seedance2_variants: bool = False) -> dict[str, str]:

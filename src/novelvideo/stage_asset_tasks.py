@@ -260,6 +260,10 @@ def resolve_scene_360_image_model(provider: str = "", model: str = "") -> str:
             or os.environ.get("OPENROUTER_GPT_IMAGE2_MODEL")
             or "openai/gpt-5.4-image-2"
         )
+    if resolved_provider == "dreamina":
+        from novelvideo.config import DREAMINA_IMAGE_MODEL
+
+        return DREAMINA_IMAGE_MODEL
     return ""
 
 

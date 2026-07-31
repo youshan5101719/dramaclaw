@@ -30,7 +30,7 @@ def _gateway_model_from_backend(backend: str | None) -> str:
     lowered = value.lower()
     if lowered == "newapi":
         return NEWAPI_VIDEO_MODEL
-    for prefix in ("newapi_", "huimeng_", "huimengi_"):
+    for prefix in ("newapi_", "huimeng_", "huimengi_", "dreamina_"):
         if lowered.startswith(prefix):
             return value[len(prefix) :].strip()
     return ""
@@ -43,6 +43,8 @@ def video_duration_bounds_for_backend(
     from novelvideo.config import NEWAPI_VIDEO_DURATION_BOUNDS
 
     model = _gateway_model_from_backend(backend)
+    if str(backend or "").strip().lower().startswith("dreamina_"):
+        return (4, 15)
     configured = parse_video_duration_bounds(NEWAPI_VIDEO_DURATION_BOUNDS)
     if model:
         bounds = configured.get(model)

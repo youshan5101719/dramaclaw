@@ -131,7 +131,7 @@ const KELVIN_GRADIENT = `linear-gradient(to right, ${[
   .map((k) => kelvinToHex(k))
   .join(", ")})`;
 
-export type LightProviderId = "huimeng" | "openrouter" | "openai";
+export type LightProviderId = "dreamina" | "huimeng" | "newapi" | "openrouter" | "openai";
 
 export const LIGHT_IMAGE_SIZES = ["1K", "2K", "4K"] as const;
 export type LightImageSize = (typeof LIGHT_IMAGE_SIZES)[number];

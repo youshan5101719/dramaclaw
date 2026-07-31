@@ -28,7 +28,7 @@ Shot-by-shot **video generation** plus emotion-aware **voiceover (TTS)**, then *
 - **Freezone (infinite canvas)**: a node-based visual workbench — drag in project assets to generate images / video / audio, open Director World, and promote satisfying candidates back to the main pipeline; main pipeline and free exploration run as dual tracks.
 - **Visual Style (style templates)**: set a project-wide style template (style prompts, avoid-instructions, style tags), upload a reference image to auto-extract parameters, and apply it across the whole project.
 - **Xia Director (Chat / Agent)**: a conversational creative assistant that runs through every stage — script, assets, and scenes.
-- **Multi-model BYO**: all text / image / video / audio models are reached through a single OpenAI-compatible gateway; use an official key or [bring your own gateway](../getting-started/configuring-models.md).
+- **Multi-model BYO**: use the official RelayClaw service or [bring your own OpenAI-compatible gateway](../getting-started/configuring-models.md); optionally add a Dreamina subscription image/video channel through the authenticated macOS host bridge.
 - **Single-machine self-hosting**: local auth, no-login single user, inline execution, up and running with `docker compose up`; all data stays local.
 
 ## Boundaries

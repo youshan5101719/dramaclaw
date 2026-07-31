@@ -97,6 +97,7 @@ export async function fetchCanvasGenerationHistory(
 
 export type FreezoneProvider =
   | "newapi"
+  | "dreamina"
   | "openrouter"
   | "huimeng"
   | "openai";
@@ -863,6 +864,7 @@ const MODEL_PROVIDER_HINTS: Array<{
   match: (raw: string) => boolean;
   providerId: FreezoneProvider;
 }> = [
+  { match: (s) => s.toLowerCase().startsWith("dreamina"), providerId: "dreamina" },
   { match: (s) => s.toLowerCase().startsWith("huimeng"), providerId: "huimeng" },
   { match: (s) => s.toLowerCase().includes("/gemini"), providerId: "openrouter" },
   { match: (s) => s.toLowerCase().startsWith("google/"), providerId: "openrouter" },
@@ -929,6 +931,7 @@ function normalizeProviderId(raw: string | null): FreezoneProvider | null {
   const lowered = raw.toLowerCase();
   if (
     lowered === "newapi" ||
+    lowered === "dreamina" ||
     lowered === "huimeng" ||
     lowered === "openrouter" ||
     lowered === "openai"
@@ -1029,7 +1032,7 @@ export async function fetchFreezoneImageModels(
 // /freezone/video/models -------------------------------------------------- //
 
 /** Provider tab id for video generation models. */
-export type FreezoneVideoProvider = "newapi" | "seedance" | "huimeng";
+export type FreezoneVideoProvider = "newapi" | "dreamina" | "seedance" | "huimeng";
 
 export interface FreezoneVideoModelInfo {
   /** Opaque database identity used by new billing and task records. */
@@ -1068,6 +1071,7 @@ const VIDEO_MODEL_PROVIDER_HINTS: Array<{
   match: (raw: string) => boolean;
   providerId: FreezoneVideoProvider;
 }> = [
+  { match: (s) => s.toLowerCase().startsWith("dreamina"), providerId: "dreamina" },
   { match: (s) => s.toLowerCase().startsWith("huimeng"), providerId: "huimeng" },
   { match: (s) => s.toLowerCase().startsWith("seedance"), providerId: "seedance" },
 ];
@@ -1082,7 +1086,12 @@ function inferVideoProvider(raw: string): FreezoneVideoProvider {
 function normalizeVideoProviderId(raw: string | null): FreezoneVideoProvider | null {
   if (!raw) return null;
   const lowered = raw.toLowerCase();
-  if (lowered === "newapi" || lowered === "seedance" || lowered === "huimeng") return lowered;
+  if (
+    lowered === "newapi" ||
+    lowered === "dreamina" ||
+    lowered === "seedance" ||
+    lowered === "huimeng"
+  ) return lowered;
   return null;
 }
 

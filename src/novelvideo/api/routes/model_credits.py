@@ -150,6 +150,7 @@ def _image_selection_cost_model(selection: str) -> str:
     from novelvideo.config import (
         IMAGE_GENERATION_SELECTIONS,
         character_image_selection_options,
+        image_generation_selection_billing_model,
     )
 
     options = character_image_selection_options()
@@ -161,7 +162,7 @@ def _image_selection_cost_model(selection: str) -> str:
 
     if clean_selection not in IMAGE_GENERATION_SELECTIONS:
         raise HTTPException(status_code=400, detail="invalid image selection")
-    return IMAGE_GENERATION_SELECTIONS[clean_selection]["model"]
+    return image_generation_selection_billing_model(clean_selection)
 
 
 def _video_backend_cost_model(backend: str) -> str:
@@ -172,14 +173,20 @@ def _video_backend_cost_model(backend: str) -> str:
     from novelvideo.generators.huimengi import parse_huimeng_video_backend
     from novelvideo.generators.video_generator import (
         VideoBackend,
+        dreamina_video_backend_options,
         newapi_video_backend_options,
+        parse_dreamina_video_backend,
         parse_newapi_video_backend,
     )
 
+    dreamina_options = dreamina_video_backend_options(configured_only=False)
     newapi_model = parse_newapi_video_backend(clean_backend)
+    dreamina_model = parse_dreamina_video_backend(clean_backend)
     huimeng_model = parse_huimeng_video_backend(clean_backend)
     backend_enum: VideoBackend | None = None
-    if not newapi_model and not huimeng_model:
+    if dreamina_model and clean_backend not in dreamina_options:
+        raise HTTPException(status_code=400, detail="invalid video backend")
+    if not newapi_model and not dreamina_model and not huimeng_model:
         try:
             backend_enum = VideoBackend(clean_backend)
         except ValueError:
@@ -189,15 +196,21 @@ def _video_backend_cost_model(backend: str) -> str:
                 clean_backend,
                 {
                     **newapi_video_backend_options(),
+                    **dreamina_options,
                     **huimeng_video_backend_options(),
                 },
                 label_name="video backend",
             )
             newapi_model = parse_newapi_video_backend(clean_backend)
+            dreamina_model = parse_dreamina_video_backend(clean_backend)
             huimeng_model = parse_huimeng_video_backend(clean_backend)
 
     if newapi_model:
         return newapi_model
+    if dreamina_model:
+        # Keep subscription-backed generation distinct from metered gateway
+        # Seedance models so EE billing cannot charge the wrong channel.
+        return f"dreamina_{dreamina_model}"
     if huimeng_model:
         return huimeng_model
 
@@ -371,7 +384,7 @@ def _video_backend_feature_billing_params(params: dict) -> dict:
         video_backend,
         params.get("pricing_quantity"),
     )
-    return {
+    resolved = {
         **params,
         "pricing_kind": "video",
         "pricing_model": pricing_model,
@@ -379,6 +392,21 @@ def _video_backend_feature_billing_params(params: dict) -> dict:
         "pricing_quantity": pricing_quantity,
         "pricing_model_selection": video_backend,
     }
+    from novelvideo.generators.video_generator import (
+        dreamina_video_backend_options,
+        parse_dreamina_video_backend,
+    )
+
+    if parse_dreamina_video_backend(video_backend):
+        resolved.update(
+            {
+                "provider": "dreamina",
+                "pricing_model_label": dreamina_video_backend_options(
+                    configured_only=False
+                ).get(video_backend, video_backend),
+            }
+        )
+    return resolved
 
 
 def freezone_video_generate_billing_params(params: dict) -> dict:
@@ -548,12 +576,13 @@ def freezone_image_feature_billing_params(feature_key: str, params: dict) -> dic
         return params
     from novelvideo.config import (
         IMAGE_GENERATION_SELECTIONS,
+        image_generation_selection_billing_model,
         normalize_image_generation_selection,
     )
 
     selection = normalize_image_generation_selection(image_selection)
     model_cfg = IMAGE_GENERATION_SELECTIONS.get(selection) or {}
-    pricing_model = str(model_cfg.get("model") or "").strip()
+    pricing_model = image_generation_selection_billing_model(selection)
     if not pricing_model:
         return params
     try:
@@ -572,6 +601,11 @@ def freezone_image_feature_billing_params(feature_key: str, params: dict) -> dic
         "pricing_quantity": pricing_quantity,
         "pricing_model_selection": selection,
         "pricing_model_label": str(model_cfg.get("label") or selection),
+        **(
+            {"provider": "dreamina"}
+            if str(model_cfg.get("provider") or "").strip() == "dreamina"
+            else {}
+        ),
     }
 
 
@@ -664,12 +698,13 @@ def _feature_billing_params(value: str, params: dict, *, mode_key: str = "") -> 
             return params
         from novelvideo.config import (
             IMAGE_GENERATION_SELECTIONS,
+            image_generation_selection_billing_model,
             normalize_image_generation_selection,
         )
 
         selection = normalize_image_generation_selection(image_selection)
         model_cfg = IMAGE_GENERATION_SELECTIONS.get(selection) or {}
-        pricing_model = str(model_cfg.get("model") or "").strip()
+        pricing_model = image_generation_selection_billing_model(selection)
         if not pricing_model:
             return params
         return {
@@ -682,6 +717,11 @@ def _feature_billing_params(value: str, params: dict, *, mode_key: str = "") -> 
             ),
             "pricing_model_selection": selection,
             "pricing_model_label": str(model_cfg.get("label") or selection),
+            **(
+                {"provider": "dreamina"}
+                if str(model_cfg.get("provider") or "").strip() == "dreamina"
+                else {}
+            ),
         }
     feature_image_role = {
         "mainline.character_portrait": "character",
@@ -702,6 +742,7 @@ def _feature_billing_params(value: str, params: dict, *, mode_key: str = "") -> 
         return params
     from novelvideo.config import (
         IMAGE_GENERATION_SELECTIONS,
+        image_generation_selection_billing_model,
         normalize_character_image_selection,
         normalize_image_generation_selection,
     )
@@ -712,7 +753,7 @@ def _feature_billing_params(value: str, params: dict, *, mode_key: str = "") -> 
         else normalize_character_image_selection(image_selection)
     )
     model_cfg = IMAGE_GENERATION_SELECTIONS.get(selection) or {}
-    pricing_model = str(model_cfg.get("model") or "").strip()
+    pricing_model = image_generation_selection_billing_model(selection)
     if not pricing_model:
         return params
     pricing_params = (
@@ -731,6 +772,11 @@ def _feature_billing_params(value: str, params: dict, *, mode_key: str = "") -> 
         "pricing_params": pricing_params,
         "pricing_model_selection": selection,
         "pricing_model_label": str(model_cfg.get("label") or selection),
+        **(
+            {"provider": "dreamina"}
+            if str(model_cfg.get("provider") or "").strip() == "dreamina"
+            else {}
+        ),
     }
 
 

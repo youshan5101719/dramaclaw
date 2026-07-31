@@ -1493,6 +1493,43 @@ def test_newapi_prop_reference_reraises_insufficient_credit(monkeypatch, tmp_pat
         )
 
 
+def test_dreamina_prop_reference_uses_host_bridge(monkeypatch, tmp_path):
+    from novelvideo.generators import nanobanana_prop
+
+    captured = {}
+
+    async def fake_call_dreamina_image_bridge(**kwargs):
+        captured.update(kwargs)
+        return b"dreamina-prop", "", ""
+
+    monkeypatch.setenv("DREAMINA_BRIDGE_URL", "http://bridge.test")
+    monkeypatch.setenv("DREAMINA_BRIDGE_TOKEN", "t" * 32)
+    monkeypatch.setattr(
+        nanobanana_prop,
+        "_call_dreamina_image_bridge",
+        fake_call_dreamina_image_bridge,
+    )
+    output_path = tmp_path / "assets" / "props" / "玉佩" / "reference_3view.png"
+
+    result = run_async(
+        nanobanana_prop.generate_prop_reference(
+            visual_prompt="青绿色玉佩，边缘有金色纹路",
+            output_path=str(output_path),
+            model="dreamina_subscription",
+        )
+    )
+
+    assert result == str(output_path)
+    assert output_path.read_bytes() == b"dreamina-prop"
+    assert captured["base_url"] == "http://bridge.test"
+    assert captured["api_key"] == "t" * 32
+    assert captured["model"] == "5.0"
+    assert captured["image_config"] == {
+        "aspect_ratio": "16:9",
+        "image_size": "0.5K",
+    }
+
+
 def test_freezone_single_image_generation_routes_newapi(monkeypatch, tmp_path):
     from novelvideo.generators import nanobanana_grid
 

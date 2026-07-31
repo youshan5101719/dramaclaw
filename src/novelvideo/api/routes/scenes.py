@@ -149,12 +149,13 @@ def _scene_reference_billing_metadata(model_selection: str) -> dict[str, Any]:
     from novelvideo.api.routes.model_credits import _fixed_image_billing_params
     from novelvideo.config import (
         IMAGE_GENERATION_SELECTIONS,
+        image_generation_selection_billing_model,
         normalize_image_generation_selection,
     )
 
     selection = normalize_image_generation_selection(model_selection)
     model_config = IMAGE_GENERATION_SELECTIONS.get(selection) or {}
-    pricing_model = str(model_config.get("model") or "").strip()
+    pricing_model = image_generation_selection_billing_model(selection)
     if not pricing_model:
         return {}
     return {
@@ -167,6 +168,11 @@ def _scene_reference_billing_metadata(model_selection: str) -> dict[str, Any]:
         ),
         "pricing_model_selection": selection,
         "pricing_model_label": str(model_config.get("label") or selection),
+        **(
+            {"provider": "dreamina"}
+            if str(model_config.get("provider") or "").strip() == "dreamina"
+            else {}
+        ),
     }
 
 

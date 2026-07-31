@@ -30,6 +30,7 @@ from novelvideo.config import (
     get_style_preset,
 )
 from novelvideo.generators.nanobanana_grid import (
+    _call_dreamina_image_bridge,
     _call_huimeng_image_api,
     _call_newapi_image_api,
     _call_openai_image_api,
@@ -1024,6 +1025,26 @@ async def run(args: argparse.Namespace) -> int:
             },
             base_url=base_url,
             trace=provider_trace,
+        )
+    elif provider == "dreamina":
+        from novelvideo.config import get_grid_generation_config
+
+        config = get_grid_generation_config(
+            provider_override="dreamina",
+            model_override=args.model,
+            image_size_override=args.image_size,
+        )
+        model = str(config.get("model") or "")
+        image_bytes, _text, error = await _call_dreamina_image_bridge(
+            api_key=str(config.get("api_key") or ""),
+            model=model,
+            prompt=prompt,
+            reference_images=reference_images,
+            image_config={
+                "aspect_ratio": "2:1",
+                "image_size": args.image_size,
+            },
+            base_url=str(config.get("base_url") or ""),
         )
     elif provider == "openrouter":
         api_key = os.environ.get("OPENROUTER_API_KEY")
