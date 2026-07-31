@@ -14,8 +14,22 @@ DramaClaw 是社区版(CE),单机运行、无需 PostgreSQL / Redis。默认 `do
 
 ## 步骤
 
+### 使用发布镜像（推荐）
+
+每个 GitHub Release 都会发布 amd64 / arm64 镜像。无需克隆源码：
+
 ```bash
-# 1. 取得代码(当前版本由源码构建镜像;后续将改为拉取已发布镜像)
+curl -LO https://raw.githubusercontent.com/dramaclaw/dramaclaw/main/docker-compose.release.yml
+docker compose -f docker-compose.release.yml up -d
+
+# 可选：固定版本；默认 latest
+DRAMACLAW_VERSION=1.1.5 docker compose -f docker-compose.release.yml up -d
+```
+
+### 从源码构建（开发或需要 world 特性）
+
+```bash
+# 1. 取得代码
 git clone https://github.com/dramaclaw/dramaclaw.git
 cd dramaclaw
 
@@ -24,7 +38,7 @@ cp .env.example .env
 #    打开 .env,至少把 PROMPT_EXPORT_PASSWORD 改成非默认值。
 #    模型渠道和 key 在下一步通过网页配置，不写入 .env。
 
-# 3. 启动(首次构建镜像,稍慢)—— 起 api / web 两个服务
+# 3. 启动（首次构建镜像，稍慢）—— 起 api / web 两个服务
 docker compose up -d --build
 
 # 4. 确认已起

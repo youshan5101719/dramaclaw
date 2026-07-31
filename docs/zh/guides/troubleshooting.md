@@ -36,7 +36,7 @@
 | 现象 | 排查 |
 |---|---|
 | **重建后数据没了** | 数据在命名卷 `ce-data`(容器内 `/data`)。`docker compose down` 保留卷,**别加 `-v`**(会删卷)。备份见 [自托管手册](self-hosting.md#5-数据在哪--备份)。 |
-| **升级后报配置错误** | 当前由源码构建:`git pull` 后 `docker compose up -d --build`;对照新版 `.env.example` 补齐新增变量。 |
+| **升级后报配置错误** | 发布镜像部署先确认 `DRAMACLAW_VERSION` 与 compose 文件匹配并执行 `pull`；源码部署在 `git pull` 后执行 `docker compose up -d --build`。两种方式都应对照新版 `.env.example` 补齐新增变量。 |
 
 ## world 特性(3DGS/SHARP)类
 

@@ -15,9 +15,7 @@ DramaClaw CE 通过 NewAPI 兼容网关接入文本、图片、视频、音频�
 
 ## 配置入口
 
-启动后打开 `http://localhost:8080`，进入设置 → 模型配置。渠道选择、网关地址和 token 都保存在本机 `settings.db`，不从环境变量读取。
-
-启动后打开 `http://localhost:8080`，进入设置 -> 模型配置。
+启动后打开 `http://localhost:8080`，进入设置 -> 模型配置。渠道选择、网关地址和 token 都保存在本机 `settings.db`，不从环境变量读取。
 
 在网页里可以完成：
 
@@ -103,7 +101,13 @@ RelayClaw 后台已经配置好 DramaClaw 需要的逻辑模型名，所以不�
 docker compose -f docker-compose.selfhosted.yml up -d --build
 ```
 
-该编排会启动 `api`、`web` 和内置 `newapi`。NewAPI 后台默认在 `http://localhost:3000`。
+如果使用发布镜像：
+
+```bash
+docker compose -f docker-compose.selfhosted.release.yml up -d
+```
+
+两种编排都会启动 `api`、`web` 和内置 `newapi`。NewAPI 后台默认在 `http://localhost:3000`。
 
 `docker-compose.selfhosted.yml` 会把同一个 `newapi-data` 卷分别挂载到 NewAPI 的
 `/data` 和 DramaClaw API 的 `/newapi-data`。初始化向导会调用 NewAPI `/api/setup`
@@ -251,5 +255,6 @@ Cloudinary 的 Cloud name、API Key、API Secret 可以在 Cloudinary 控制台�
 - `.env.example`：完整环境变量列表和默认值。
 - `docker-compose.yml`：默认官方渠道部署。
 - `docker-compose.selfhosted.yml`：内置 NewAPI 自托管部署。
+- `docker-compose.selfhosted.release.yml`：使用发布镜像的内置 NewAPI 部署。
 - [自托管手册](../guides/self-hosting.md)
 - [环境变量参考](../reference/environment-variables.md)

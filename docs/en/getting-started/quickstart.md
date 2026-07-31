@@ -14,8 +14,22 @@ DramaClaw is the Community Edition (CE): it runs on a single machine with no Pos
 
 ## Steps
 
+### Use published images (recommended)
+
+Every GitHub Release publishes amd64 and arm64 images. No source checkout is required:
+
 ```bash
-# 1. Get the code (the current version builds the image from source; later releases will pull a published image)
+curl -LO https://raw.githubusercontent.com/dramaclaw/dramaclaw/main/docker-compose.release.yml
+docker compose -f docker-compose.release.yml up -d
+
+# Optional: pin a version; defaults to latest
+DRAMACLAW_VERSION=1.1.5 docker compose -f docker-compose.release.yml up -d
+```
+
+### Build from source (development or the optional world feature)
+
+```bash
+# 1. Get the code
 git clone https://github.com/dramaclaw/dramaclaw.git
 cd dramaclaw
 
