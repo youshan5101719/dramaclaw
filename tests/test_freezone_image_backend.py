@@ -6300,6 +6300,14 @@ async def test_freezone_image_models_returns_selection_keys(
             "api_model": "newapi_nanobanana2",
             "label": "LingShan-NB-2",
         },
+        {
+            "id": "dreamina_subscription",
+            "providerId": "dreamina",
+            "provider": "dreamina",
+            "apiModel": "dreamina_subscription",
+            "api_model": "dreamina_subscription",
+            "label": "即梦订阅账号（Seedream 5.0）",
+        },
     ]
 
 
